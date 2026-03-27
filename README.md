@@ -22,9 +22,12 @@ cd AcadeMong
 ```
 
 **2. Set up environment variables**
+
+Create a `.env` file in the root. All required variables and their values are documented in [CLAUDE.md section 16](./CLAUDE.md#16-environment-variables-env).
+
 ```bash
-cp .env.example .env
-# Edit .env with your values (see CLAUDE.md section 16)
+touch .env
+# Fill in values from CLAUDE.md section 16
 ```
 
 **3. Start all services**
