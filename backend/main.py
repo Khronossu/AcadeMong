@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import httpx
+from routers.models import router as models_router
 
 app = FastAPI(title="AcadeMong API", version="0.1.0")
 
@@ -12,6 +13,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(models_router, prefix="/api/models")
 
 async def _check_postgres() -> str:
     try:
