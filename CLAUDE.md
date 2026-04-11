@@ -42,43 +42,44 @@ An adaptive AI decision-support system for Thai students applying to universitie
 
 ## 4. Architecture
 
-### 4.1 High-Level System Flow
+### 4.1 High-Level System Flow (2 AI Agents)
 
 ```
 User (Web Frontend)
-        ↓
+↓
+Google OAuth Login
+↓
 FastAPI Backend
-        ↓
-Auth Middleware (JWT)
-        ↓
-Long-Term Memory Fetch (PostgreSQL)
-        ↓
-Session Memory Load (Redis)
-        ↓
-Request Orchestrator
-        ↓
-Intent Router
-        ↓
-Engine Selection (SQL / RAG / Career / Hybrid)
-        ↓
-Adaptive Prompt Composer
-        ↓
-Model Router → Ollama (Typhoon2 / Llama3.1)
-        ↓
-Memory Update (Redis → PostgreSQL summarization)
-        ↓
-Response
+↓
+Mode Selector (User explicitly chooses flow)
+├── Flow A: Thai Career Dreamer (AI 1)
+│       ↓
+│   Semantic Career Matcher (Qdrant + JobsDB Catalog)
+│       ↓
+│   Typhoon2 generates Personalized Career Profile
+│       ↓
+│   Update user_career_profiles (PostgreSQL)
+│
+└── Flow B: TCAS RAG & Comparator (AI 2)
+↓
+Fetch Career Goal / GPAX from Profile
+↓
+Hybrid RAG (Qdrant PDF chunks + SQL Admission Projects)
+↓
+Typhoon2 provides factual eligibility & comparisons
+↓
+User saves preferred faculties (user_saved_majors)
 ```
 
 ### 4.2 Two Subsystems
 
 **Offline Knowledge Engineering** (build once, update periodically)
-- TCAS CSV ingestion → PostgreSQL
+- TCAS Deep Ingestion: CSV → PostgreSQL (Hierarchy: Round → Project → Subjects)
 - PDF parsing + chunking + embedding → Qdrant
-- Career data → PostgreSQL `career_paths` table
+- Career Catalog Scraping (e.g., JobsDB) → PostgreSQL `career_catalog` + Qdrant Embeddings
 
 **Online Adaptive Runtime** (handles every user request)
-- Intent routing, engine selection, prompt composition, LLM inference, memory management
+- Two distinct AI engines (`dreamer` and `tcas_rag`) with separated chat session memory to prevent context bleeding.
 
 ---
 
@@ -87,77 +88,124 @@ Response
 ### PostgreSQL Tables
 
 ```sql
--- Users
-users (
-  user_id       UUID PRIMARY KEY,
-  username      VARCHAR UNIQUE,
-  password_hash VARCHAR,
-  gpax          FLOAT,
-  interests     JSONB,   -- subject strengths, preferred fields
-  memory        JSONB,   -- long-term AI memory: explored majors, career interests, history summary
-  created_at    TIMESTAMP
-)
+-- 1. CORE SYSTEM & ANALYTICS (Firebase Auth)
+CREATE TABLE IF NOT EXISTS users (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email         VARCHAR UNIQUE NOT NULL,
+  firebase_uid  VARCHAR UNIQUE NOT NULL, 
+  username      VARCHAR UNIQUE,          -- User-defined handle
+  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  last_login_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
 
--- Universities
-universities (
-  id    UUID PRIMARY KEY,
-  name  VARCHAR,
+CREATE TABLE IF NOT EXISTS user_profiles (
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+  first_name     VARCHAR,
+  last_name      VARCHAR,
+  date_of_birth  DATE,
+  avatar_url     VARCHAR,
+  address        VARCHAR,                 -- Home address details
+  sub_district   VARCHAR,
+  district       VARCHAR,
+  province       VARCHAR,
+  postal_code    VARCHAR,
+  current_school VARCHAR,
+  gpax           NUMERIC(3, 2)            -- Precision: 0.00 to 9.99, for eligibility accuracy
+);
+
+-- 2. AI 1: THAI CAREER DREAMER & CATALOG
+CREATE TABLE IF NOT EXISTS user_career_profiles (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id             UUID REFERENCES users(id) ON DELETE CASCADE UNIQUE,
+  personality_summary TEXT,
+  strengths           JSONB,
+  updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS industry_groups (
+  id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR UNIQUE NOT NULL           -- e.g., 'งานไอที', 'งานวิศวกรรม'
+);
+
+CREATE TABLE IF NOT EXISTS career_catalog (
+  id                     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  industry_group_id      UUID REFERENCES industry_groups(id) ON DELETE SET NULL,
+  title                  VARCHAR NOT NULL,
+  overview_description   TEXT,
+  avg_salary_thb         INT,
+  active_job_openings    INT,            -- From real-time scraping
+  responsibilities       JSONB,          -- Scraped from JobsDB
+  education_requirements JSONB,
+  top_skills             JSONB,
+  last_scraped_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_recommended_careers (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID REFERENCES users(id) ON DELETE CASCADE,
+  career_id       UUID REFERENCES career_catalog(id) ON DELETE CASCADE,
+  match_score     FLOAT,
+  ai_reasoning    TEXT,
+  created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, career_id)
+);
+
+-- 3. TCAS KNOWLEDGE GRAPH (Deep Structure)
+CREATE TABLE IF NOT EXISTS universities (
+  id       UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name     VARCHAR NOT NULL UNIQUE,
   location VARCHAR
-)
+);
 
--- Faculties
-faculties (
-  id              UUID PRIMARY KEY,
-  university_id   UUID REFERENCES universities(id),
-  name            VARCHAR
-)
+CREATE TABLE IF NOT EXISTS faculties (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  university_id UUID REFERENCES universities(id) ON DELETE CASCADE,
+  name          VARCHAR NOT NULL
+);
 
--- Majors
-majors (
-  id          UUID PRIMARY KEY,
-  faculty_id  UUID REFERENCES faculties(id),
-  name        VARCHAR,
-  field       VARCHAR   -- science, arts, business, etc.
-)
+CREATE TABLE IF NOT EXISTS majors (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  faculty_id UUID REFERENCES faculties(id) ON DELETE CASCADE,
+  name       VARCHAR NOT NULL,
+  field      VARCHAR                 -- e.g., 'Engineering', 'Health Science'
+);
 
--- TCAS Rounds (eligibility core)
-tcas_rounds (
-  id        UUID PRIMARY KEY,
-  major_id  UUID REFERENCES majors(id),
-  round     INT,        -- 1, 2, 3, 4
-  year      INT,
-  gpax_min  FLOAT,
-  seats     INT
-)
+CREATE TABLE IF NOT EXISTS tcas_rounds (
+  id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  major_id     UUID REFERENCES majors(id) ON DELETE CASCADE,
+  round_number INT NOT NULL,
+  year         INT NOT NULL
+);
 
--- Subject Requirements
-subject_requirements (
-  id        UUID PRIMARY KEY,
-  major_id  UUID REFERENCES majors(id),
-  subject   VARCHAR,
-  min_score FLOAT,
-  weight    FLOAT
-)
+CREATE TABLE IF NOT EXISTS admission_projects (
+  id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  tcas_round_id       UUID REFERENCES tcas_rounds(id) ON DELETE CASCADE,
+  project_name        VARCHAR NOT NULL, -- e.g., 'โครงการจุฬาฯ-ชนบท'
+  seats               INT,
+  gpax_min            NUMERIC(3, 2),    -- Precision: 0.00 to 9.99, no hallucination
+  accepts_ged         BOOLEAN,
+  specific_conditions TEXT,
+  source_url          VARCHAR
+);
 
--- Career Paths
-career_paths (
-  id                UUID PRIMARY KEY,
-  major_id          UUID REFERENCES majors(id),
-  career_title      VARCHAR,
-  salary_min        INT,
-  salary_max        INT,
-  license_required  VARCHAR,
-  demand_level      VARCHAR   -- high, medium, low
-)
+CREATE TABLE IF NOT EXISTS subject_requirements (
+  id                   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  admission_project_id UUID REFERENCES admission_projects(id) ON DELETE CASCADE,
+  subject              VARCHAR NOT NULL, -- e.g., 'TGAT', 'A-Level Math'
+  min_score            FLOAT,
+  weight_percent       FLOAT
+);
 
--- Conversation History
-conversation_history (
-  id        UUID PRIMARY KEY,
-  user_id   UUID REFERENCES users(user_id),
-  role      VARCHAR,   -- 'user' or 'assistant'
-  content   TEXT,
-  timestamp TIMESTAMP
-)
+-- 4. AI 2: TCAS RAG & COMPARATOR
+CREATE TABLE IF NOT EXISTS user_saved_majors (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id    UUID REFERENCES users(id) ON DELETE CASCADE,
+  major_id   UUID REFERENCES majors(id) ON DELETE CASCADE,
+  notes      TEXT,                   -- Personal student annotations
+  saved_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, major_id)
+);
 ```
 
 ### Redis Keys (Session)
@@ -172,31 +220,13 @@ session:{user_id}:current_window      → JSON array (last N messages)
 
 ## 6. Core Components
 
-### 6.1 Intent Router
-Classifies every incoming query into one of:
-
-| Intent | Triggers Engine |
-|---|---|
-| `general` | LLM only |
-| `eligibility` | SQL Eligibility Engine |
-| `recommendation` | Major Recommendation Engine |
-| `preparation` | RAG Engine |
-| `comparison` | SQL + RAG hybrid |
-| `career` | Career Path Engine |
-
-Start with rule-based classification (keyword matching). Upgrade to a small classifier model only if accuracy is insufficient.
+### 6.1 Mode Selector (Replaces Intent Router)
+Instead of relying on LLM intent classification (which is prone to errors), the system uses explicit mode selection from the frontend UI:
+- **Mode A (Career Dreamer):** Activates AI 1 to extract user strengths and search `career_catalog`.
+- **Mode B (TCAS RAG):** Activates AI 2 to evaluate eligibility and compare faculties.
 
 ### 6.2 Eligibility Engine (SQL — No LLM)
-```python
-# Pseudologic — never hand this to the LLM
-if student.gpax < major.gpax_min:
-    return {"eligible": False, "reason": "GPAX below threshold"}
-if student.subject_score(required_subject) < subject.min_score:
-    return {"eligible": False, "reason": f"{subject} score insufficient"}
-return {"eligible": True}
-```
-
-This is deterministic. No fuzzy logic. No LLM involved at any step.
+Matches user's `USER_PROFILES.gpax` and subjects against the deep hierarchy: `tcas_rounds` → `admission_projects` → `subject_requirements`. Ensures 100% deterministic accuracy.
 
 ### 6.3 RAG Engine (Hybrid Retrieval)
 Activated only for: preparation guidance, curriculum explanation, portfolio requirements, interview expectations.
@@ -215,33 +245,13 @@ Document hashing on ingestion — only reprocess changed PDFs.
 - Output: ranked list of majors with fit score
 - Implementation: rule-based scoring for POC
 
-### 6.5 Career Path Engine
-- Input: recommended majors OR declared career interest
-- Output: career paths → required licenses → salary range → demand level
-- Gap analysis: "to become X, you need to strengthen Y"
-- Data source: static JSON → loaded into PostgreSQL `career_paths`
+### 6.5 Semantic Career Matcher (Replaces Career Path Engine)
+- **Input:** User conversation from AI 1.
+- **Process:** LLM extracts JSON profile → Embeds profile → Vector search against `career_catalog` in Qdrant.
+- **Output:** Writes Top-K matches to `user_recommended_careers` with `ai_reasoning`.
 
 ### 6.6 User Memory Layer
-
-**On login:**
-```
-Fetch long-term memory (PostgreSQL users.memory JSONB)
-→ Load into Redis session
-```
-
-**Per request:**
-```
-Pull Redis session context
-→ Inject into prompt composer
-→ Update Redis after response
-```
-
-**On session end (or every N turns):**
-```
-Prompt Typhoon2 to summarize conversation
-→ Extract structured fields (explored majors, career interests, GPAX updates)
-→ Write back to PostgreSQL users.memory JSONB
-```
+Chat history is strictly partitioned by `session_id` and `ai_mode` in `chat_messages`. This prevents AI 2 from hallucinating TCAS criteria based on a previous chat about career dreams.
 
 ### 6.7 Adaptive Prompt Composer
 Final prompt = layered composition:
@@ -271,16 +281,16 @@ Final prompt = layered composition:
 ```python
 MODEL_CONFIG = {
     "primary": {
-        "model": "typhoon2-8b-instruct",
-        "intents": ["general", "eligibility", "recommendation", "career"],
+        "model": "scb10x/llama3.1-typhoon2-8b-instruct",
+        "intents": ["dreamer_chat", "tcas_chat"],
         "temperature": 0.3,
         "top_p": 0.9,
         "max_tokens": 1000
     },
     "rag": {
-        "model": "typhoon2-8b-instruct",
-        "intents": ["preparation", "comparison"],
-        "temperature": 0.2,   # lower — needs to stay grounded to retrieved context
+        "model": "scb10x/llama3.1-typhoon2-8b-instruct",
+        "intents": ["tcas_rag_retrieval"],
+        "temperature": 0.1,   # lower — strict grounding
         "top_p": 0.85,
         "max_tokens": 1500
     },
@@ -288,7 +298,7 @@ MODEL_CONFIG = {
         "model": "nomic-embed-text"
     },
     "fallback": {
-        "model": "llama3.1-8b",
+        "model": "llama3.1:8b",
         "trigger": "primary_model_failure"
     }
 }
@@ -298,12 +308,18 @@ MODEL_CONFIG = {
 
 ## 8. Auth
 
-- **Register**: hash password with bcrypt → store in `users` table
-- **Login**: verify password → return JWT token (python-jose)
-- **Protected routes**: JWT middleware on all `/api/*` endpoints
-- **Session**: token carries `user_id`, used to scope all Redis keys and DB queries
-
-No OAuth. No email verification. No password reset. POC only.
+- **Provider:** Firebase Authentication (replaces custom JWT logic).
+- **Methods:**
+  1. Google OAuth (Primary)
+  2. Email & Password (Secondary/Manual)
+- **Flow:**
+  1. Frontend (React) uses Firebase SDK to authenticate
+  2. Frontend sends Firebase `idToken` to Backend via `Authorization: Bearer <token>` header
+  3. Backend uses `firebase-admin` SDK to verify the token signature and expiry
+  4. Backend maps `firebase_uid` → internal `users.id` from PostgreSQL
+  5. On successful verification: fetch user profile from PostgreSQL → load into Redis session cache
+  6. On session end: serialize user memory → write back to PostgreSQL
+- **Rationale:** Production-grade security, easy user management, no password hashing burden, instant access to Google profiles without manual OAuth boilerplate.
 
 ---
 
@@ -350,7 +366,7 @@ volumes:
 
 **After first start, pull models:**
 ```bash
-docker exec -it ollama ollama pull typhoon2-8b-instruct
+docker exec -it ollama ollama pull scb10x/llama3.1-typhoon2-8b-instruct
 docker exec -it ollama ollama pull nomic-embed-text
 docker exec -it ollama ollama pull llama3.1:8b
 ```
@@ -369,11 +385,11 @@ tcas-advisor/
 │   │   ├── chat.py                # main chat endpoint
 │   │   └── profile.py             # user profile CRUD
 │   ├── engines/
-│   │   ├── intent_router.py
-│   │   ├── eligibility_engine.py
-│   │   ├── recommendation_engine.py
-│   │   ├── rag_engine.py
-│   │   └── career_engine.py
+│   │   ├── mode_selector.py           # Explicit UI-driven mode: Flow A or Flow B
+│   │   ├── eligibility_engine.py      # SQL-only eligibility matching
+│   │   ├── recommendation_engine.py   # Rule-based major recommendation
+│   │   ├── rag_engine.py              # Hybrid retrieval + reranking
+│   │   ├── career_matcher.py          # Semantic career matching (Qdrant)
 │   ├── memory/
 │   │   ├── session_memory.py      # Redis operations
 │   │   └── long_term_memory.py    # PostgreSQL JSONB operations
@@ -420,10 +436,10 @@ tcas-advisor/
 | TCAS admission criteria | MYTCAS (mytcas.com) | CSV | PostgreSQL |
 | มคอ.2 documents | University websites | PDF | Qdrant (RAG) |
 | Faculty announcements | University websites | PDF | Qdrant (RAG) |
-| Occupational standards | TPQI (tpqi.go.th) | PDF/Web | career_paths table |
-| Job market data | DOE (doe.go.th) | PDF/Web | career_paths table |
-| Job postings + salaries | Jobsdu, JobThai | Web scrape | career_paths table |
-| Licensing requirements | Regulatory body websites | Web scrape | career_paths table |
+| Occupational standards | TPQI (tpqi.go.th) | PDF/Web | career_catalog + Qdrant embeddings |
+| Job market data | DOE (doe.go.th) | PDF/Web | career_catalog + Qdrant embeddings |
+| Job postings + salaries | Jobsdu, JobThai | Web scrape | career_catalog + Qdrant embeddings |
+| Licensing requirements | Regulatory body websites | Web scrape | career_catalog + Qdrant embeddings |
 
 **Target universities for initial data collection:**
 - Chulalongkorn University
@@ -440,13 +456,13 @@ tcas-advisor/
 Phase 1  → Infrastructure: Docker Compose, all services running, /health endpoint
 Phase 2  → Model config + router + Ollama client
 Phase 3  → PostgreSQL schema + migrations
-Phase 4  → Auth: register, login, JWT middleware
+Phase 4  → Auth: Firebase authentication, idToken verification, user storage
 Phase 5  → TCAS CSV ingestion + eligibility engine (SQL only, test with sample profiles)
 Phase 6  → PDF parser + chunker + Qdrant ingestion + hybrid retrieval
-Phase 7  → Career data collection + career_paths table + career engine
-Phase 8  → Online runtime: intent router + orchestrator + memory layer
+Phase 7  → Career data collection + career_catalog table + semantic career matcher
+Phase 8  → Online runtime: Mode Selector (explicit UI routing) + orchestrator + memory layer
 Phase 9  → Prompting system: master prompt + dynamic composer + behavior adaptation
-Phase 10 → Frontend: chat UI + profile form + career view
+Phase 10 → Frontend: chat UI (Flow A/B selector) + profile form + career view
 Phase 11 → End-to-end testing with golden query set
 ```
 
@@ -476,12 +492,15 @@ The orchestrator is useless without a working knowledge base.
 - [ ] Migrations run cleanly
 - [ ] Foreign keys verified
 
-### Phase 4 — Auth
-- [ ] `POST /register` — bcrypt hash, store user
-- [ ] `POST /login` — verify, return JWT
-- [ ] JWT middleware protecting `/api/*`
-- [ ] On login: fetch PostgreSQL memory → push to Redis
-- [ ] On session end: summarize → write back to PostgreSQL
+### Phase 4 — Auth (Firebase)
+- [ ] Firebase project created and credentials configured in `.env`
+- [ ] `firebase-admin` SDK initialized in `config.py`
+- [ ] `POST /register` — accept email/password or direct OAuth, store `firebase_uid` + `username` in PostgreSQL
+- [ ] `POST /login` — accept Firebase `idToken`, verify signature, return session cookie or token
+- [ ] Firebase token verification middleware protecting `/api/*`
+- [ ] On login: fetch user profile from PostgreSQL → cache in Redis session
+- [ ] On session end: summarize memory → write back to PostgreSQL `user_career_profiles` and `user_profiles`
+- [ ] Test: sign up via Google OAuth → login → verify JWT-equivalent token issued
 
 ### Phase 5 — Structured Knowledge
 - [ ] TCAS CSVs downloaded
@@ -502,19 +521,21 @@ The orchestrator is useless without a working knowledge base.
 
 ### Phase 7 — Career Layer
 - [ ] Career data collected (TPQI, DOE, Jobsdu, JobThai)
-- [ ] Static JSON mapping: major → careers → licenses → salary
-- [ ] Loaded into `career_paths` table
-- [ ] Career-major alignment scoring implemented
-- [ ] Gap analysis logic implemented
+- [ ] Career entries loaded into `career_catalog` with `industry_group_id` links
+- [ ] Career title embeddings generated and stored in Qdrant under "careers" collection
+- [ ] Career-to-major mapping logic implemented
+- [ ] Semantic career matching tested with sample user profiles
 
-### Phase 8 — Online Runtime
-- [ ] Intent router classifying all 6 intent types correctly
-- [ ] Major Recommendation Engine (rule-based, ranked output)
-- [ ] Redis session memory: read + write per request
-- [ ] PostgreSQL long-term memory: fetch on login, update on session end
-- [ ] Memory injected into every prompt composition
-- [ ] Request Orchestrator wiring all engines together
-- [ ] Conversation summarizer (Typhoon2 → structured memory fields)
+### Phase 8 — Online Runtime (Orchestrator & Mode Selector)
+- [ ] Mode Selector properly routing to Flow A or Flow B based on Frontend UI selection
+- [ ] Flow A (Career Dreamer): Extract user strengths → call Semantic Career Matcher → vectorize → search Qdrant → write to `user_recommended_careers`
+- [ ] Flow B (TCAS RAG): Fetch GPAX/subjects → run Eligibility Engine → hybrid RAG retrieval → pass to Typhoon2 → return structured comparison
+- [ ] Major Recommendation Engine (rule-based, ranked output with fit scores)
+- [ ] Redis session memory: read on request start, write after AI response
+- [ ] PostgreSQL long-term memory: fetch on login, update on session end via conversation summarizer
+- [ ] Memory injected into every prompt composition (user profile, saved majors, career interests)
+- [ ] Request Orchestrator wiring Mode Selector → engines → memory layer → prompt composer
+- [ ] Conversation summarizer: Typhoon2 extracts structured fields → update PostgreSQL
 
 ### Phase 9 — Prompting System
 - [ ] Static Master Prompt written and frozen
@@ -553,12 +574,18 @@ The orchestrator is useless without a working knowledge base.
 | Decision | Rationale |
 |---|---|
 | Eligibility is always SQL, never LLM | LLMs hallucinate thresholds. This is the most critical correctness requirement. |
-| PostgreSQL JSONB for user memory | Flexible schema without adding MongoDB. Already in the stack. |
-| Qdrant for vectors | Docker-native, no managed service needed |
-| Typhoon2 as primary model | Thai language capability is non-negotiable for Thai student users |
-| Hybrid BM25 + dense retrieval | Dense alone misses exact numeric matches (score thresholds, subject codes) |
-| Redis for session, PostgreSQL for long-term | Redis is fast for in-session reads; PostgreSQL persists across sessions |
-| No CI/CD | POC scope. Not production. |
+| GPAX precision: NUMERIC(3, 2) | Fixes FLOAT rounding errors (e.g., 3.99 vs 4.00). Eligibility logic demands exact matches. No ambiguity. |
+| Mode Selector (explicit UI routing) | Avoids LLM intent classification errors. User explicitly chooses Flow A (Career) or Flow B (TCAS). Clear, deterministic, testable. |
+| Firebase Authentication | Production auth, no password hashing burden, easy Google OAuth integration, session token verification is fast. |
+| Two separate AI agents (Dreamer + RAG) | Prevents context bleeding. Career dreams don't confuse TCAS criteria engine. Session memory partitioned by `ai_mode`. |
+| PostgreSQL JSONB for user memory | Flexible schema without adding MongoDB. Already in the stack. Supports arbitrary profile extensions. |
+| Qdrant for vectors | Docker-native, no managed service needed. Metadata filtering for efficient retrieval. |
+| Typhoon2 as primary model | Thai language capability is non-negotiable for Thai student users. Local, no API cost. |
+| Hybrid BM25 + dense retrieval | Dense alone misses exact numeric matches (score thresholds, subject codes). Hybrid ensures both semantic and lexical correctness. |
+| Redis for session, PostgreSQL for long-term | Redis is fast for in-session reads; PostgreSQL persists across sessions and supports complex queries. |
+| industry_groups as master table | Enables career categorization reuse across job market data sources. Normalized structure avoids duplication. |
+| Semantic Career Matcher (Qdrant search) | Replaces hard-coded mapping. Scalable to new careers via embeddings. JobsDB catalog embedded + indexed. |
+| No CI/CD | POC scope. Not production. Team is small (4). Manual PR review sufficient. |
 | No MongoDB | PostgreSQL JSONB covers flexible schema. Adding MongoDB adds a 6th service with no POC benefit. |
 | Static JSON for career data (initial) | Fast to build. Load into PostgreSQL for querying. Upgrade to scraped data if time permits. |
 
@@ -680,7 +707,7 @@ Examples:
 phase-1/docker-compose-setup
 phase-3/postgres-schema
 phase-6/pdf-parser
-phase-8/intent-router
+phase-8/mode-selector-orchestrator
 phase-10/chat-ui
 ```
 
@@ -719,7 +746,7 @@ Examples:
 [phase-1] add docker-compose with all 5 services (#1)
 [phase-3] add users and universities tables to schema (#8)
 [phase-6] implement BM25 + dense retrieval pipeline (#19)
-[phase-8] wire intent router to engine selector (#27)
+[phase-8] wire mode selector to engine orchestrator (#27)
 ```
 
 ---
@@ -820,13 +847,13 @@ QDRANT_PORT=6333
 OLLAMA_HOST=ollama
 OLLAMA_PORT=11434
 
-# Auth
-JWT_SECRET=your-secret-key-here
-JWT_ALGORITHM=HS256
-JWT_EXPIRY_HOURS=24
+# Firebase Auth
+FIREBASE_PROJECT_ID=your-firebase-project-id
+FIREBASE_PRIVATE_KEY=your-firebase-private-key
+FIREBASE_CLIENT_EMAIL=your-firebase-client-email
 
 # Models
-PRIMARY_MODEL=typhoon2-8b-instruct
+PRIMARY_MODEL=scb10x/llama3.1-typhoon2-8b-instruct
 EMBEDDING_MODEL=nomic-embed-text
 FALLBACK_MODEL=llama3.1:8b
 
