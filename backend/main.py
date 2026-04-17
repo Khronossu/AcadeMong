@@ -3,8 +3,16 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import httpx
 from routers.models import router as models_router
+from contextlib import asynccontextmanager
+from db.postgres import init_pool, close_pool, ping
 
-app = FastAPI(title="AcadeMong API", version="0.1.0")
+@asynccontextmanager
+async def lifespan(app):
+    await init_pool()
+    yield
+    await close_pool()
+
+app = FastAPI(title="AcadeMong API", version="0.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -17,17 +25,8 @@ app.add_middleware(
 app.include_router(models_router, prefix="/api/models")
 
 async def _check_postgres() -> str:
-    try:
-        import asyncpg                                                                                                                                                                              
-        conn = await asyncpg.connect(
-            host=os.getenv("POSTGRES_HOST"),                                                                                                                                                        
-            port=int(os.getenv("POSTGRES_PORT")),                                                                                                                                                 
-            database=os.getenv("POSTGRES_DB"),
-            user=os.getenv("POSTGRES_USER"),                                                                                                                                                        
-            password=os.getenv("POSTGRES_PASSWORD"),
-        )                                                                                                                                                                                           
-        await conn.close()                                                                                                                                                                        
-        return "ok"
+    try:                                                                                                                                                                       
+        return "ok" if await ping() else "error: ping returned false"
     except Exception as e:
         return f"error: {e}"
 
@@ -72,3 +71,4 @@ async def health():
     }
     overall = all(v == "ok" for v in services.values())
     return {"status": "ok" if overall else "degraded", "services": services}
+
