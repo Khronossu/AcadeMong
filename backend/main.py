@@ -12,7 +12,7 @@ from auth.firebase_admin import initialize_firebase
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_postgres_pool()
-    await init_redis_pool()
+    init_redis_pool()
     initialize_firebase()
     yield
     await close_redis_pool()
