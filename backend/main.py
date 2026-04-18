@@ -3,12 +3,15 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import httpx
 from routers.models import router as models_router
+from routers.auth import router as auth_router
 from contextlib import asynccontextmanager
 from db.postgres import init_pool, close_pool, ping
+from auth.firebase_admin import initialize_firebase
 
 @asynccontextmanager
-async def lifespan(app):
+async def lifespan(app: FastAPI):
     await init_pool()
+    initialize_firebase()
     yield
     await close_pool()
 
@@ -22,7 +25,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(models_router, prefix="/api/models")
+app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(models_router, prefix="/api/models", tags=["Models"])
 
 async def _check_postgres() -> str:
     try:                                                                                                                                                                       
@@ -71,4 +75,3 @@ async def health():
     }
     overall = all(v == "ok" for v in services.values())
     return {"status": "ok" if overall else "degraded", "services": services}
-
