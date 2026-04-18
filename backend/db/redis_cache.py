@@ -1,0 +1,46 @@
+import os
+import json
+from typing import Optional
+from uuid import UUID
+from datetime import date, datetime
+from decimal import Decimal
+
+import redis.asyncio as aioredis
+
+redis_pool: Optional[aioredis.Redis] = None
+
+
+def init_redis_pool():
+    """Initializes the Redis connection pool."""
+    global redis_pool
+    if redis_pool is None:
+        redis_pool = aioredis.from_url(
+            f"redis://{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}",
+            encoding="utf-8",
+            decode_responses=True
+        )
+
+
+async def close_redis_pool():
+    """Closes the Redis connection pool."""
+    if redis_pool:
+        await redis_pool.close()
+
+
+def _session_serializer(obj):
+    """Helper to serialize types not supported by default json."""
+    if isinstance(obj, (datetime, date)):
+        return obj.isoformat()
+    if isinstance(obj, UUID):
+        return str(obj)
+    if isinstance(obj, Decimal):
+        return float(obj)
+    raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
+
+
+async def set_user_session(user_id: str, session_data: dict, expires_in_seconds: int = 3600):
+    if not redis_pool:
+        raise ConnectionError("Redis pool is not initialized.")
+    session_key = f"session:{user_id}:profile"
+    profile_json = json.dumps(session_data, default=_session_serializer)
+    await redis_pool.set(session_key, profile_json, ex=expires_in_seconds)

@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from auth.firebase_admin import verify_token
 from db.postgres import fetchrow
+from db.redis_cache import set_user_session
 
 router = APIRouter()
 
@@ -75,3 +76,64 @@ async def register_user(req: RegisterRequest):
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"A database conflict occurred: {e.detail}")
     except Exception as e:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"A database error occurred: {e}")
+
+
+class LoginRequest(BaseModel):
+    idToken: str
+
+
+class LoginResponse(BaseModel):
+    message: str
+    user_id: UUID
+    username: str
+
+
+@router.post(
+    "/login",
+    response_model=LoginResponse,
+    summary="Log in a user and create a session",
+    description="Accepts a Firebase idToken, verifies it, finds the user in the database, and caches their profile in Redis.",
+)
+async def login_user(req: LoginRequest):
+    """
+    - Verifies the Firebase `idToken`.
+    - Looks up the user by `firebase_uid`.
+    - Fetches the user's profile from PostgreSQL.
+    - Caches the user and profile data into a Redis session.
+    - Returns a success message with user details.
+    """
+    decoded_token = await verify_token(req.idToken)
+    firebase_uid = decoded_token.get("uid")
+
+    if not firebase_uid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Firebase token is missing 'uid' claim.")
+
+    # Find user in our database
+    user_record = await fetchrow(
+        "SELECT id, username FROM users WHERE firebase_uid = $1",
+        firebase_uid
+    )
+
+    if not user_record:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found. Please register first."
+        )
+
+    user_id = user_record["id"]
+
+    # Fetch user profile to cache it (it's okay if it's not found)
+    profile_record = await fetchrow(
+        "SELECT * FROM user_profiles WHERE user_id = $1",
+        user_id
+    )
+
+    session_data = {"user": dict(user_record), "profile": dict(profile_record) if profile_record else None}
+
+    await set_user_session(user_id=str(user_id), session_data=session_data)
+
+    return LoginResponse(
+        message="Login successful, session created.",
+        user_id=user_id,
+        username=user_record["username"]
+    )
