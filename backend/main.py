@@ -6,7 +6,7 @@ from routers.models import router as models_router
 from routers.auth import router as auth_router
 from contextlib import asynccontextmanager
 from db.postgres import init_pool as init_postgres_pool, close_pool as close_postgres_pool, ping
-from db.redis_cache import init_redis_pool, close_redis_pool
+from memory.session_memory import init_redis_pool, close_redis_pool
 from auth.firebase_admin import initialize_firebase
 
 @asynccontextmanager

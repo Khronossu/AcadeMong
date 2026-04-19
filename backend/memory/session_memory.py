@@ -14,8 +14,16 @@ def init_redis_pool():
     """Initializes the Redis connection pool."""
     global redis_pool
     if redis_pool is None:
+        redis_host = os.getenv('REDIS_HOST')
+        redis_port = os.getenv('REDIS_PORT')
+        
+        if not redis_host or not redis_port:
+            raise ValueError(
+                "REDIS_HOST and REDIS_PORT environment variables must be set."
+            )
+            
         redis_pool = aioredis.from_url(
-            f"redis://{os.getenv('REDIS_HOST')}:{os.getenv('REDIS_PORT')}",
+            f"redis://{redis_host}:{redis_port}",
             encoding="utf-8",
             decode_responses=True
         )

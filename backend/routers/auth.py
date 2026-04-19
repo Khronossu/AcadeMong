@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 from auth.firebase_admin import verify_token
 from db.postgres import fetchrow
-from db.redis_cache import set_user_session
+from memory.session_memory import set_user_session
 
 router = APIRouter()
 
@@ -124,7 +124,7 @@ async def login_user(req: LoginRequest):
 
     # Fetch user profile to cache it (it's okay if it's not found)
     profile_record = await fetchrow(
-        "SELECT * FROM user_profiles WHERE user_id = $1",
+        "SELECT id, user_id, first_name, last_name, date_of_birth, avatar_url, address, sub_district, district, province, postal_code, current_school, gpax FROM user_profiles WHERE user_id = $1",
         user_id
     )
 
