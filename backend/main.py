@@ -5,15 +5,18 @@ import httpx
 from routers.models import router as models_router
 from routers.auth import router as auth_router
 from contextlib import asynccontextmanager
-from db.postgres import init_pool, close_pool, ping
+from db.postgres import init_pool as init_postgres_pool, close_pool as close_postgres_pool, ping
+from memory.session_memory import init_redis_pool, close_redis_pool
 from auth.firebase_admin import initialize_firebase
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_pool()
+    await init_postgres_pool()
+    init_redis_pool()
     initialize_firebase()
     yield
-    await close_pool()
+    await close_redis_pool()
+    await close_postgres_pool()
 
 app = FastAPI(title="AcadeMong API", version="0.1.0", lifespan=lifespan)
 
