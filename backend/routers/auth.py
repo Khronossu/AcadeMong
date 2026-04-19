@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from auth.firebase_admin import verify_token
 from db.postgres import fetchrow
+from memory.session_memory import set_user_session
 
 router = APIRouter()
 
