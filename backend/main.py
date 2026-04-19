@@ -3,12 +3,15 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import httpx
 from routers.models import router as models_router
+from routers.auth import router as auth_router
 from contextlib import asynccontextmanager
 from db.postgres import init_pool, close_pool, ping
+from auth.firebase_admin import initialize_firebase
 
 @asynccontextmanager
-async def lifespan(app):
+async def lifespan(app: FastAPI):
     await init_pool()
+    initialize_firebase()
     yield
     await close_pool()
 
@@ -22,43 +25,44 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.include_router(models_router, prefix="/api/models")
+app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
+app.include_router(models_router, prefix="/api/models", tags=["Models"])
 
 async def _check_postgres() -> str:
-    try:                                                                                                                                                                       
+    try:
         return "ok" if await ping() else "error: ping returned false"
     except Exception as e:
         return f"error: {e}"
 
-async def _check_redis() -> str:                                                                                                                                                                    
-    try:                                                                                                                                                                                            
-        import redis.asyncio as aioredis                                                                                                                                                            
-        r = aioredis.Redis(                                                                                                                                                                         
-            host=os.getenv("REDIS_HOST"),                                                                                                                                                         
-            port=int(os.getenv("REDIS_PORT")),                                                                                                                                                      
+async def _check_redis() -> str:
+    try:
+        import redis.asyncio as aioredis
+        r = aioredis.Redis(
+            host=os.getenv("REDIS_HOST"),
+            port=int(os.getenv("REDIS_PORT")),
         )
-        await r.ping()                                                                                                                                                                              
-        await r.aclose()                                                                                                                                                                          
+        await r.ping()
+        await r.aclose()
         return "ok"
     except Exception as e:
         return f"error: {e}"
 
-async def _check_qdrant() -> str:                                                                                                                                                                   
-    try:                                                                                                                                                                                            
+async def _check_qdrant() -> str:
+    try:
         url = f"http://{os.getenv('QDRANT_HOST')}:{os.getenv('QDRANT_PORT')}/healthz"
-        async with httpx.AsyncClient(timeout=3) as client:                                                                                                                                          
-            r = await client.get(url)                                                                                                                                                             
-            return "ok" if r.status_code == 200 else f"error: status {r.status_code}"                                                                                                               
-    except Exception as e:                                                                                                                                                                          
+        async with httpx.AsyncClient(timeout=3) as client:
+            r = await client.get(url)
+            return "ok" if r.status_code == 200 else f"error: status {r.status_code}"
+    except Exception as e:
         return f"error: {e}"
 
-async def _check_ollama() -> str:                                                                                                                                                                   
-    try:                                                                                                                                                                                          
+async def _check_ollama() -> str:
+    try:
         url = f"http://{os.getenv('OLLAMA_HOST')}:{os.getenv('OLLAMA_PORT')}/api/tags"
-        async with httpx.AsyncClient(timeout=3) as client:                                                                                                                                          
+        async with httpx.AsyncClient(timeout=3) as client:
             r = await client.get(url)
-            return "ok" if r.status_code == 200 else f"error: status {r.status_code}"                                                                                                               
-    except Exception as e:                                                                                                                                                                        
+            return "ok" if r.status_code == 200 else f"error: status {r.status_code}"
+    except Exception as e:
         return f"error: {e}"
 
 @app.get("/health")
@@ -71,4 +75,3 @@ async def health():
     }
     overall = all(v == "ok" for v in services.values())
     return {"status": "ok" if overall else "degraded", "services": services}
-
