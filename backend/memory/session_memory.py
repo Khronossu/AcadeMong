@@ -52,3 +52,11 @@ async def set_user_session(user_id: str, session_data: dict, expires_in_seconds:
     session_key = f"session:{user_id}:profile"
     profile_json = json.dumps(session_data, default=_session_serializer)
     await redis_pool.set(session_key, profile_json, ex=expires_in_seconds)
+
+
+async def get_user_session(user_id: str) -> dict | None:
+    if not redis_pool:
+        raise ConnectionError("Redis pool is not initialized.")
+    session_key = f"session:{user_id}:profile"
+    raw = await redis_pool.get(session_key)
+    return json.loads(raw) if raw else None

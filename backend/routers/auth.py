@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from auth.firebase_admin import verify_token
-from db.postgres import fetchrow
+from db.postgres import fetchrow, execute
 from memory.session_memory import set_user_session
 
 router = APIRouter()
@@ -100,6 +100,7 @@ async def login_user(req: LoginRequest):
     - Looks up the user by `firebase_uid`.
     - Fetches the user's profile from PostgreSQL.
     - Caches the user and profile data into a Redis session.
+    - Updates `last_login_at`.
     - Returns a success message with user details.
     """
     decoded_token = await verify_token(req.idToken)
@@ -121,6 +122,12 @@ async def login_user(req: LoginRequest):
         )
 
     user_id = user_record["id"]
+
+    # Update last login time
+    await execute(
+        "UPDATE users SET last_login_at = CURRENT_TIMESTAMP WHERE id = $1",
+        user_id
+    )
 
     # Fetch user profile to cache it (it's okay if it's not found)
     profile_record = await fetchrow(
