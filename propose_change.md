@@ -63,6 +63,7 @@ CREATE TABLE IF NOT EXISTS user_test_scores (
                                        -- 'A_LEVEL_MATH1', 'A_LEVEL_PHYSICS', etc.
     score       NUMERIC(6,2) NOT NULL,
     exam_year   INTEGER NOT NULL,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE(user_id, test_code, exam_year)
 );
@@ -85,15 +86,20 @@ CREATE TABLE IF NOT EXISTS historical_cutoffs (
     id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     admission_project_id UUID REFERENCES admission_projects(id) ON DELETE CASCADE,
     year                 INTEGER NOT NULL,
+    score_type           VARCHAR(30) NOT NULL,  -- 'composite_weighted' | 'TGAT_total' |
+                                                -- 'TPAT1' | 'A_LEVEL_MATH1' | etc.
+                                                -- Identifies WHICH score the min/max/median refer to.
     min_admitted_score   NUMERIC(6,2),
     max_admitted_score   NUMERIC(6,2),
     median_score         NUMERIC(6,2),
     applicants_count     INTEGER,
     accepted_count       INTEGER,
     source_url           TEXT,
-    UNIQUE(admission_project_id, year)
+    UNIQUE(admission_project_id, year, score_type)
 );
 ```
+
+**Why `score_type`:** Round 3 admissions use per-project composite scores computed from multiple tests with different weights. "Minimum admitted score = 72.5" is meaningless without saying *72.5 of what*. A project may publish both the composite cutoff AND per-subject sub-cutoffs — those are different rows with different `score_type` values. Updating the `UNIQUE` constraint accordingly.
 
 **Why:** The guide's Score Matcher mode says *"Provide the minimum, maximum, and safe-margin scores for their target majors."* That is empirical cutoff data, not rubric minimums. `subject_requirements.min_score` answers *"you're eligible to apply"*; `historical_cutoffs` answers *"you're likely to be accepted."* These are different questions.
 
@@ -123,6 +129,31 @@ ALTER TABLE admission_projects ADD COLUMN round_metadata JSONB;
 
 **Why `round_type` as a name alongside the existing `round_number`:** app code filters by semantic name ("get all Portfolio projects") more often than by number. Costs one VARCHAR, saves join to `tcas_rounds` on every query.
 
+**Consistency guard (CHECK constraint).** `round_type` and the linked `tcas_rounds.round_number` carry the same information in two places. Ingestion bugs could easily desync them (e.g. `round_type='admission'` on a `round_number=1` project). Add a CHECK that forces the two to agree:
+
+```sql
+ALTER TABLE admission_projects
+ADD CONSTRAINT admission_projects_round_type_matches_round_number
+CHECK (
+    round_type IS NULL
+    OR (round_type = 'portfolio'  AND EXISTS (SELECT 1 FROM tcas_rounds r WHERE r.id = tcas_round_id AND r.round_number = 1))
+    OR (round_type = 'quota'      AND EXISTS (SELECT 1 FROM tcas_rounds r WHERE r.id = tcas_round_id AND r.round_number = 2))
+    OR (round_type = 'admission'  AND EXISTS (SELECT 1 FROM tcas_rounds r WHERE r.id = tcas_round_id AND r.round_number = 3))
+    OR (round_type = 'direct'     AND EXISTS (SELECT 1 FROM tcas_rounds r WHERE r.id = tcas_round_id AND r.round_number = 4))
+);
+```
+
+> Note: Postgres does not allow subqueries inside CHECK. If this form is rejected, implement the same guard as a `BEFORE INSERT/UPDATE` trigger or enforce in the ingestion layer with a unit test. The *requirement* is that the two fields cannot desync; the mechanism is negotiable.
+
+**Weight authority — JSONB vs. `subject_requirements`.** Two places now hold score weights: `round_metadata.score_weights` (JSONB, raw from the announcement PDF) and `subject_requirements.weight_percent` (normalized, per-row). These are **not redundant**; they have different roles:
+
+| Field | Role | Source of truth for |
+|---|---|---|
+| `round_metadata.score_weights` (JSONB) | Raw parsed intermediate from announcement PDF table extraction. Preserves the document's exact shape for debugging/audit. | Nothing the app queries directly. |
+| `subject_requirements.weight_percent` | Normalized, query-shaped. One row per subject per project. | **All eligibility and score-matching queries.** |
+
+The ingestion flow is: parse announcement PDF → write raw JSONB to `round_metadata.score_weights` → normalize into `subject_requirements` rows. If the two ever disagree, `subject_requirements` wins and the JSONB is considered stale parse output. Nothing in the runtime reads the JSONB for computation.
+
 ### 4.4 DEFERRED (not building now): `major_career_mapping`
 
 My earlier suggestion was a dedicated `major_career_mapping` table with hand-curated `directness` labels (direct/common/possible). **Withdrawing this.**
@@ -133,19 +164,23 @@ My earlier suggestion was a dedicated `major_career_mapping` table with hand-cur
 
 ```sql
 -- After Phase 7 has populated career_catalog with education_requirements,
--- derive the mapping:
+-- derive the mapping. education_requirements.majors is a JSONB array of
+-- major-name strings (e.g. ["Computer Engineering", "Software Engineering"]).
+-- JSONB's `?` operator checks object-KEY containment, not array-VALUE
+-- containment — so we use `@> to_jsonb(m.name)` to test array membership.
 CREATE MATERIALIZED VIEW major_career_derived AS
 SELECT
-    m.id AS major_id,
-    c.id AS career_id,
-    -- count how many times this major appears in the career's requirements
-    (c.education_requirements -> 'majors') ? m.name AS is_direct_fit
+    m.id   AS major_id,
+    c.id   AS career_id,
+    TRUE   AS is_direct_fit
 FROM majors m
-CROSS JOIN career_catalog c
-WHERE (c.education_requirements -> 'majors') ? m.name;
+JOIN career_catalog c
+  ON (c.education_requirements -> 'majors') @> to_jsonb(m.name);
 ```
 
-This gives us a derived mapping for free. Refresh on career data reload.
+The `JOIN` (not `CROSS JOIN`) keeps the result small — only (major, career) pairs that actually match are emitted, which is the useful shape for the app. The `is_direct_fit` column is a placeholder for future extension (e.g. weighted match scores); for now it's always `TRUE` because every row represents a confirmed match.
+
+Refresh on career data reload: `REFRESH MATERIALIZED VIEW major_career_derived;`.
 
 ### 4.5 DEFERRED: `admission_project_quotas`
 
@@ -234,6 +269,12 @@ Before retrieving, classify query intent (lightweight — keyword rules or short
 | **Portfolio/prep question** | `doc_type='announcement' OR 'prep_guide'` |
 
 **Never**: retrieve `authority_level='curriculum_only'` for an admission question. The system must refuse to cite curriculum docs as admission evidence.
+
+**Ambiguous / unclassifiable queries — safe default.** The classifier will sometimes fail to confidently assign an intent (short query, mixed wording, user asking in unusual terms). In that case we must not silently widen retrieval to everything, because that lets curriculum docs leak into admission answers.
+
+**Default on ambiguity:** treat the query as admission-intent and apply the admission filter (`authority_level='authoritative'`, exclude `curriculum_only`). Rationale: admission is the higher-stakes failure mode — hallucinating a cutoff is worse than missing a curriculum detail. Users asking curriculum questions whose classifier confidence is low will get a narrower result set; they can rephrase. Users asking admission questions never see curriculum content masquerading as authoritative.
+
+**Implementation:** classifier returns `(intent, confidence)`. If `confidence < threshold`, force `intent='admission'`. Log these events for later tuning.
 
 ### 6.3 Year-scoped retrieval with recency preference
 
@@ -329,14 +370,18 @@ Alternatives:
 
 **My lean:** A for capstone. B if we later need i18n labels ("English Communication" in English/Thai) for the UI.
 
-### Q5. How do we handle users who retake tests?
+### Q5. How do we handle users who retake tests? — **Phase 5 blocker**
 
-`user_test_scores` allows multiple rows per user per test code across years. Do we:
-- Use only the most recent score (simple, correct for the common case)?
-- Use the highest score (what students hope for, not always what admission rules allow)?
-- Let the user pick which score to apply (transparent, more UI work)?
+`user_test_scores` allows multiple rows per user per test code across years. Before the eligibility engine ships, this must be settled — the engine's SELECT cannot remain ambiguous about which row to read.
 
-**My lean:** most recent, with a UI option to pin a specific year's score manually. Let the eligibility engine's SQL pick with `ORDER BY exam_year DESC LIMIT 1`.
+**Decision required before Phase 5 coding starts.** Options:
+- Use only the most recent score (simple, correct for the common case).
+- Use the highest score (what students hope for, not always what admission rules allow).
+- Let the user pick which score to apply (transparent, more UI work).
+
+**My lean — and proposed default for Phase 5:** most recent. Eligibility engine's SQL uses `ORDER BY exam_year DESC LIMIT 1`. A "pin specific year" UI option can come later; it does not block the engine.
+
+**Why this is a blocker, not an open debate:** #25 (eligibility engine) cannot be merged without a decision — any SELECT will make one of these choices implicitly. Better to make it explicitly, document it, and test against it.
 
 ### Q6. How aggressive should the "insufficient data" response be?
 
