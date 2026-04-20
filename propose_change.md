@@ -95,11 +95,37 @@ CREATE TABLE IF NOT EXISTS historical_cutoffs (
     applicants_count     INTEGER,
     accepted_count       INTEGER,
     source_url           TEXT,
-    UNIQUE(admission_project_id, year, score_type)
+    -- SCD Type 2: preserve full history of restatements
+    effective_from       TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    effective_to         TIMESTAMP WITH TIME ZONE,  -- NULL = still current
+    is_current           BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at           TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Enforce: at most one CURRENT row per (project, year, score_type).
+-- Superseded rows (is_current=FALSE) are unconstrained so history can accumulate.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_historical_cutoffs_current
+    ON historical_cutoffs(admission_project_id, year, score_type)
+    WHERE is_current;
 ```
 
-**Why `score_type`:** Round 3 admissions use per-project composite scores computed from multiple tests with different weights. "Minimum admitted score = 72.5" is meaningless without saying *72.5 of what*. A project may publish both the composite cutoff AND per-subject sub-cutoffs — those are different rows with different `score_type` values. Updating the `UNIQUE` constraint accordingly.
+**Why `score_type`:** Round 3 admissions use per-project composite scores computed from multiple tests with different weights. "Minimum admitted score = 72.5" is meaningless without saying *72.5 of what*. A project may publish both the composite cutoff AND per-subject sub-cutoffs — those are different rows with different `score_type` values.
+
+**Why SCD Type 2 (not a natural `year` key alone):** `year` time-stamps *which admission cycle* a cutoff belongs to; it does not time-stamp *when we observed the value*. Universities restate cutoff statistics — preliminary numbers published shortly after Round 3 closes are often revised later (waitlist activity, appeals, late reporting). Without version history, re-ingesting overwrites the original observation and we lose audit trail. SCD Type 2 keeps both versions:
+
+- Current reads filter `WHERE is_current`.
+- Audit / "what did we tell students in June 2025?" reads filter `WHERE effective_from <= $1 AND (effective_to IS NULL OR effective_to > $1)`.
+
+**Ingestion flow** (when a new value arrives for an existing (`project`, `year`, `score_type`)):
+```sql
+UPDATE historical_cutoffs
+   SET is_current = FALSE, effective_to = CURRENT_TIMESTAMP
+ WHERE admission_project_id = $1 AND year = $2 AND score_type = $3 AND is_current;
+
+INSERT INTO historical_cutoffs (admission_project_id, year, score_type, ...)
+VALUES ($1, $2, $3, ...);  -- is_current defaults TRUE, effective_from defaults now()
+```
+Wrap both in a transaction to keep the partial-unique-index invariant safe.
 
 **Why:** The guide's Score Matcher mode says *"Provide the minimum, maximum, and safe-margin scores for their target majors."* That is empirical cutoff data, not rubric minimums. `subject_requirements.min_score` answers *"you're eligible to apply"*; `historical_cutoffs` answers *"you're likely to be accepted."* These are different questions.
 
@@ -143,7 +169,7 @@ CHECK (
 );
 ```
 
-> Note: Postgres does not allow subqueries inside CHECK. If this form is rejected, implement the same guard as a `BEFORE INSERT/UPDATE` trigger or enforce in the ingestion layer with a unit test. The *requirement* is that the two fields cannot desync; the mechanism is negotiable.
+> **Implementation note:** Postgres **unconditionally forbids subqueries inside CHECK constraints** (all versions — the SQL above will always fail to create). The CHECK syntax is shown to document the *intent*; the actual implementation must be a `BEFORE INSERT/UPDATE` trigger on `admission_projects` that performs the lookup into `tcas_rounds` and raises on mismatch. Do not spend time trying to make the CHECK form work. The *requirement* is that the two fields cannot desync; the mechanism is the trigger.
 
 **Weight authority — JSONB vs. `subject_requirements`.** Two places now hold score weights: `round_metadata.score_weights` (JSONB, raw from the announcement PDF) and `subject_requirements.weight_percent` (normalized, per-row). These are **not redundant**; they have different roles:
 
@@ -180,7 +206,16 @@ JOIN career_catalog c
 
 The `JOIN` (not `CROSS JOIN`) keeps the result small — only (major, career) pairs that actually match are emitted, which is the useful shape for the app. The `is_direct_fit` column is a placeholder for future extension (e.g. weighted match scores); for now it's always `TRUE` because every row represents a confirmed match.
 
-Refresh on career data reload: `REFRESH MATERIALIZED VIEW major_career_derived;`.
+**Refresh on career data reload — use `CONCURRENTLY`:**
+```sql
+-- Requires a UNIQUE index on the view (below) — CONCURRENTLY won't work without it.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_major_career_derived
+    ON major_career_derived(major_id, career_id);
+
+REFRESH MATERIALIZED VIEW CONCURRENTLY major_career_derived;
+```
+
+Without `CONCURRENTLY`, `REFRESH` takes an `ACCESS EXCLUSIVE` lock and blocks all reads for the refresh duration. Since Phase 7 career scrapes will run while the system is live, a non-concurrent refresh is effectively a brief outage. The `CONCURRENTLY` variant holds only a lighter lock and lets reads continue.
 
 ### 4.5 DEFERRED: `admission_project_quotas`
 
