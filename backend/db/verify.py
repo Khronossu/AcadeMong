@@ -32,7 +32,9 @@ EXPECTED_TABLES: set[str] = {
     'subject_requirements',
     'user_saved_majors',
     'chat_sessions',
-    'chat_messages'
+    'chat_messages',
+    'user_test_scores',
+    'historical_cutoffs',
 }
 
 # Map: (child_table, child_column) -> (parent_table, delete_rule)
@@ -51,7 +53,9 @@ EXPECTED_FKS: dict[tuple[str, str], tuple[str, str]] = {
     ('user_saved_majors', 'user_id'): ('users', 'CASCADE'),
     ('user_saved_majors', 'major_id'): ('majors', 'CASCADE'),
     ('chat_sessions', 'user_id'): ('users', 'CASCADE'),
-    ('chat_messages', 'session_id'): ('chat_sessions', 'CASCADE')
+    ('chat_messages', 'session_id'): ('chat_sessions', 'CASCADE'),
+    ('user_test_scores', 'user_id'): ('users', 'CASCADE'),
+    ('historical_cutoffs', 'admission_project_id'): ('admission_projects', 'CASCADE'),
 }
 
 # ── Tiny output helpers ─────────────────────────────────────────────────────
@@ -163,6 +167,23 @@ async def check_cascades() -> bool:
     s5_uni_id = uuid.uuid4()
     s5_fac_id = uuid.uuid4()
     s5_maj_id = uuid.uuid4()
+
+    # Scenario 6: users → user_test_scores
+    s6_user_id = uuid.uuid4()
+
+    # Scenario 7: admission_projects → historical_cutoffs + partial unique index
+    s7_uni_id = uuid.uuid4()
+    s7_fac_id = uuid.uuid4()
+    s7_maj_id = uuid.uuid4()
+    s7_round_id = uuid.uuid4()
+    s7_project_id = uuid.uuid4()
+
+    # Scenario 8: round_type trigger
+    s8_uni_id = uuid.uuid4()
+    s8_fac_id = uuid.uuid4()
+    s8_maj_id = uuid.uuid4()
+    s8_round_id = uuid.uuid4()  # round_number=3
+    s8_project_id = uuid.uuid4()
 
     async with get_pool().acquire() as conn:
         # Outer transaction — the thing we'll roll back at the end.
@@ -405,6 +426,205 @@ async def check_cascades() -> bool:
                 ok(label)
             else:
                 fail(label, f"{remaining} child rows survived")
+                all_passed = False
+
+            # =============================================================
+            # Scenario 6: DELETE user -> user_test_scores CASCADE
+            # =============================================================
+            await conn.execute(
+                "INSERT INTO users (id, email, firebase_uid) VALUES ($1, $2, $3)",
+                s6_user_id, f"verify-s6-{s6_user_id}@example.com", f"fb-s6-{s6_user_id}",
+            )
+            await conn.execute(
+                "INSERT INTO user_test_scores (user_id, test_code, score, exam_year) "
+                "VALUES ($1, $2, $3, $4)",
+                s6_user_id, "TGAT1", 75.25, 2026,
+            )
+            await conn.execute("DELETE FROM users WHERE id = $1", s6_user_id)
+            remaining = await conn.fetchval(
+                "SELECT COUNT(*) FROM user_test_scores WHERE user_id = $1", s6_user_id,
+            )
+            label = "users -> user_test_scores CASCADE"
+            if remaining == 0:
+                ok(label)
+            else:
+                fail(label, f"{remaining} child rows survived")
+                all_passed = False
+
+            # =============================================================
+            # Scenario 7: DELETE admission_project -> historical_cutoffs CASCADE
+            # Also exercises the partial unique index: two current rows per
+            # (project, year, score_type) must be rejected.
+            # =============================================================
+            await conn.execute(
+                "INSERT INTO universities (id, name) VALUES ($1, $2)",
+                s7_uni_id, f"Verify Uni S7 {s7_uni_id}",
+            )
+            await conn.execute(
+                "INSERT INTO faculties (id, university_id, name) VALUES ($1, $2, $3)",
+                s7_fac_id, s7_uni_id, "Verify Faculty S7",
+            )
+            await conn.execute(
+                "INSERT INTO majors (id, faculty_id, name) VALUES ($1, $2, $3)",
+                s7_maj_id, s7_fac_id, "Verify Major S7",
+            )
+            await conn.execute(
+                "INSERT INTO tcas_rounds (id, major_id, round_number, year) VALUES ($1, $2, $3, $4)",
+                s7_round_id, s7_maj_id, 3, 2026,
+            )
+            await conn.execute(
+                "INSERT INTO admission_projects (id, tcas_round_id, project_name) VALUES ($1, $2, $3)",
+                s7_project_id, s7_round_id, "Verify Project S7",
+            )
+            # First current cutoff row for (project, 2025, composite_weighted)
+            await conn.execute(
+                "INSERT INTO historical_cutoffs (admission_project_id, year, score_type, min_admitted_score) "
+                "VALUES ($1, $2, $3, $4)",
+                s7_project_id, 2025, "composite_weighted", 72.50,
+            )
+
+            # Partial unique index: a second current row for the same key must fail.
+            # Wrap in a savepoint — a raised exception inside asyncpg's outer
+            # transaction aborts it; the savepoint lets us recover cleanly.
+            label_pu = "historical_cutoffs partial unique index (one current per key)"
+            violated = False
+            try:
+                async with conn.transaction():
+                    await conn.execute(
+                        "INSERT INTO historical_cutoffs (admission_project_id, year, score_type, min_admitted_score) "
+                        "VALUES ($1, $2, $3, $4)",
+                        s7_project_id, 2025, "composite_weighted", 73.00,
+                    )
+            except asyncpg.exceptions.UniqueViolationError:
+                violated = True
+            if violated:
+                ok(label_pu)
+            else:
+                fail(label_pu, "second current row was accepted")
+                all_passed = False
+
+            # Supersede the original row (is_current=FALSE) then insert a new current.
+            # This must succeed — the partial index only constrains WHERE is_current.
+            await conn.execute(
+                "UPDATE historical_cutoffs SET is_current = FALSE, effective_to = CURRENT_TIMESTAMP "
+                "WHERE admission_project_id = $1 AND year = $2 AND score_type = $3 AND is_current",
+                s7_project_id, 2025, "composite_weighted",
+            )
+            await conn.execute(
+                "INSERT INTO historical_cutoffs (admission_project_id, year, score_type, min_admitted_score) "
+                "VALUES ($1, $2, $3, $4)",
+                s7_project_id, 2025, "composite_weighted", 73.00,
+            )
+            current_count = await conn.fetchval(
+                "SELECT COUNT(*) FROM historical_cutoffs WHERE admission_project_id = $1 "
+                "AND year = $2 AND score_type = $3 AND is_current",
+                s7_project_id, 2025, "composite_weighted",
+            )
+            total_count = await conn.fetchval(
+                "SELECT COUNT(*) FROM historical_cutoffs WHERE admission_project_id = $1 "
+                "AND year = $2 AND score_type = $3",
+                s7_project_id, 2025, "composite_weighted",
+            )
+            label_scd = "historical_cutoffs SCD Type 2 supersede flow"
+            if current_count == 1 and total_count == 2:
+                ok(label_scd)
+            else:
+                fail(label_scd, f"expected 1 current / 2 total, got {current_count} / {total_count}")
+                all_passed = False
+
+            # Cascade on delete of parent admission_project.
+            await conn.execute("DELETE FROM admission_projects WHERE id = $1", s7_project_id)
+            remaining = await conn.fetchval(
+                "SELECT COUNT(*) FROM historical_cutoffs WHERE admission_project_id = $1",
+                s7_project_id,
+            )
+            label = "admission_projects -> historical_cutoffs CASCADE"
+            if remaining == 0:
+                ok(label)
+            else:
+                fail(label, f"{remaining} child rows survived")
+                all_passed = False
+
+            # =============================================================
+            # Scenario 8: round_type consistency trigger
+            # - permissive: NULL round_type allowed
+            # - strict: round_type='admission' on round_number=3 passes
+            # - strict: round_type='portfolio' on round_number=3 raises
+            # =============================================================
+            await conn.execute(
+                "INSERT INTO universities (id, name) VALUES ($1, $2)",
+                s8_uni_id, f"Verify Uni S8 {s8_uni_id}",
+            )
+            await conn.execute(
+                "INSERT INTO faculties (id, university_id, name) VALUES ($1, $2, $3)",
+                s8_fac_id, s8_uni_id, "Verify Faculty S8",
+            )
+            await conn.execute(
+                "INSERT INTO majors (id, faculty_id, name) VALUES ($1, $2, $3)",
+                s8_maj_id, s8_fac_id, "Verify Major S8",
+            )
+            await conn.execute(
+                "INSERT INTO tcas_rounds (id, major_id, round_number, year) VALUES ($1, $2, $3, $4)",
+                s8_round_id, s8_maj_id, 3, 2026,
+            )
+
+            # 8a: NULL round_type allowed (permissive).
+            label_8a = "round_type trigger: NULL allowed (permissive)"
+            try:
+                await conn.execute(
+                    "INSERT INTO admission_projects (id, tcas_round_id, project_name) "
+                    "VALUES ($1, $2, $3)",
+                    s8_project_id, s8_round_id, "Verify Project S8 (null type)",
+                )
+                ok(label_8a)
+            except Exception as e:
+                fail(label_8a, f"NULL rejected: {e}")
+                all_passed = False
+
+            # 8b: matching round_type accepted.
+            label_8b = "round_type trigger: matching type (admission on R3) accepted"
+            try:
+                await conn.execute(
+                    "UPDATE admission_projects SET round_type = 'admission' WHERE id = $1",
+                    s8_project_id,
+                )
+                ok(label_8b)
+            except Exception as e:
+                fail(label_8b, f"matching type rejected: {e}")
+                all_passed = False
+
+            # 8c: mismatching round_type rejected. Savepoint — trigger raises.
+            label_8c = "round_type trigger: mismatching type (portfolio on R3) rejected"
+            raised = False
+            try:
+                async with conn.transaction():
+                    await conn.execute(
+                        "UPDATE admission_projects SET round_type = 'portfolio' WHERE id = $1",
+                        s8_project_id,
+                    )
+            except asyncpg.exceptions.RaiseError:
+                raised = True
+            if raised:
+                ok(label_8c)
+            else:
+                fail(label_8c, "mismatch was accepted")
+                all_passed = False
+
+            # 8d: invalid enum value rejected. Savepoint — trigger raises.
+            label_8d = "round_type trigger: invalid value rejected"
+            raised = False
+            try:
+                async with conn.transaction():
+                    await conn.execute(
+                        "UPDATE admission_projects SET round_type = 'bogus' WHERE id = $1",
+                        s8_project_id,
+                    )
+            except asyncpg.exceptions.RaiseError:
+                raised = True
+            if raised:
+                ok(label_8d)
+            else:
+                fail(label_8d, "invalid value was accepted")
                 all_passed = False
 
         finally:
