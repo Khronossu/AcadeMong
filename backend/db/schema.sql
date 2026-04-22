@@ -174,3 +174,98 @@ CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id);
 CREATE INDEX IF NOT EXISTS idx_career_catalog_industry ON career_catalog(industry_group_id);
 CREATE INDEX IF NOT EXISTS idx_admission_projects_round ON admission_projects(tcas_round_id);
+
+-- ==========================================
+-- 6. DATA/RAG EXTENSION (propose_change.md §4)
+-- ==========================================
+
+-- Table: user_test_scores — per-subject TCAS scores, long format.
+-- See propose_change.md §4.1. Replaces a denormalized column-per-test design.
+CREATE TABLE IF NOT EXISTS user_test_scores (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+    test_code   VARCHAR(30) NOT NULL, -- 'TGAT1', 'TPAT3', 'A_LEVEL_MATH1', etc.
+    score       NUMERIC(6, 2) NOT NULL,
+    exam_year   INTEGER NOT NULL,
+    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (user_id, test_code, exam_year)
+);
+CREATE INDEX IF NOT EXISTS idx_user_test_scores_user ON user_test_scores(user_id);
+
+-- Table: historical_cutoffs — SCD Type 2 empirical cutoff history.
+-- See propose_change.md §4.2 (post-review update). `year` is admission cycle;
+-- effective_from/to track when WE observed this value (universities restate).
+CREATE TABLE IF NOT EXISTS historical_cutoffs (
+    id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    admission_project_id UUID REFERENCES admission_projects(id) ON DELETE CASCADE,
+    year                 INTEGER NOT NULL,
+    score_type           VARCHAR(30) NOT NULL, -- 'composite_weighted' | 'TGAT_total' | 'TPAT1' | ...
+    min_admitted_score   NUMERIC(6, 2),
+    max_admitted_score   NUMERIC(6, 2),
+    median_score         NUMERIC(6, 2),
+    applicants_count     INTEGER,
+    accepted_count       INTEGER,
+    source_url           TEXT,
+    -- SCD Type 2 versioning
+    effective_from       TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    effective_to         TIMESTAMP WITH TIME ZONE, -- NULL = still current
+    is_current           BOOLEAN NOT NULL DEFAULT TRUE,
+    created_at           TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+-- At most one CURRENT row per (project, year, score_type).
+-- Superseded rows unconstrained so history accumulates.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_historical_cutoffs_current
+    ON historical_cutoffs(admission_project_id, year, score_type)
+    WHERE is_current;
+CREATE INDEX IF NOT EXISTS idx_historical_cutoffs_project
+    ON historical_cutoffs(admission_project_id, year);
+
+-- ALTER: admission_projects — add round_type + round_metadata (propose_change.md §4.3)
+ALTER TABLE admission_projects
+    ADD COLUMN IF NOT EXISTS round_type      VARCHAR(30),
+    ADD COLUMN IF NOT EXISTS round_metadata  JSONB;
+
+-- Consistency trigger: round_type must match the linked tcas_rounds.round_number.
+-- CHECK constraints can't subquery, so enforced as a trigger. Permissive:
+-- NULL round_type is allowed (ingestion may set it after row creation).
+CREATE OR REPLACE FUNCTION check_admission_round_type_matches()
+RETURNS TRIGGER AS $$
+DECLARE
+    expected_round INTEGER;
+    actual_round   INTEGER;
+BEGIN
+    IF NEW.round_type IS NULL THEN
+        RETURN NEW; -- permissive: unset is allowed
+    END IF;
+
+    expected_round := CASE NEW.round_type
+        WHEN 'portfolio'  THEN 1
+        WHEN 'quota'      THEN 2
+        WHEN 'admission'  THEN 3
+        WHEN 'direct'     THEN 4
+        ELSE NULL
+    END;
+
+    IF expected_round IS NULL THEN
+        RAISE EXCEPTION 'admission_projects.round_type must be one of portfolio|quota|admission|direct, got %', NEW.round_type;
+    END IF;
+
+    SELECT round_number INTO actual_round
+      FROM tcas_rounds
+     WHERE id = NEW.tcas_round_id;
+
+    IF actual_round IS DISTINCT FROM expected_round THEN
+        RAISE EXCEPTION 'admission_projects.round_type=% expects tcas_rounds.round_number=%, got %',
+            NEW.round_type, expected_round, actual_round;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_admission_round_type_matches ON admission_projects;
+CREATE TRIGGER trg_admission_round_type_matches
+    BEFORE INSERT OR UPDATE ON admission_projects
+    FOR EACH ROW
+    EXECUTE FUNCTION check_admission_round_type_matches();
