@@ -143,3 +143,39 @@ class TcasIngestion:
                 self.stats["faculties"] += 1
 
         print(f"  faculties: {self.stats['faculties']} inserted/updated")
+
+    async def load_majors(self, rows: list[dict]):
+        for row in rows:
+            univ_slug = row["university_slug"].strip()
+            fac_slug = row["faculty_slug"].strip()
+            major_slug = row["major_slug"].strip()
+            name = row["name"].strip()
+            field = row.get("field", "").strip() or None
+            key = (univ_slug, fac_slug, major_slug)
+
+            fac_id = self._faculties.get((univ_slug, fac_slug))
+            if not fac_id:
+                print(f"  ERROR: unknown faculty '{univ_slug}/{fac_slug}' for major '{name}'", file=sys.stderr)
+                self.stats["errors"] += 1
+                continue
+
+            existing = await self._fetchrow(
+                "SELECT id FROM majors WHERE faculty_id = $1 AND name = $2",
+                fac_id, name,
+            )
+            if existing:
+                self._majors[key] = existing["id"]
+                await self._exec(
+                    "UPDATE majors SET field = COALESCE($1, field) WHERE id = $2",
+                    field, existing["id"],
+                )
+            else:
+                if not self.dry_run:
+                    major_id = await self.conn.fetchval(
+                        "INSERT INTO majors (faculty_id, name, field) VALUES ($1, $2, $3) RETURNING id",
+                        fac_id, name, field,
+                    )
+                    self._majors[key] = major_id
+                self.stats["majors"] += 1
+
+        print(f"  majors: {self.stats['majors']} inserted/updated")
