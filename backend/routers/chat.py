@@ -132,6 +132,22 @@ async def send_message(
     return MessageResponse(role="assistant", content=response_text)
 
 
+@router.get(
+    "/{session_id}/messages",
+    response_model=HistoryResponse,
+    summary="Fetch full message history for a session",
+)
+async def get_message_history(
+    session_id: UUID,
+    user: dict = Depends(get_current_user),
+):
+    session = await get_session(session_id)
+    if not session or session["user_id"] != user["id"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    messages = await get_messages(session_id)
+    return HistoryResponse(session_id=str(session_id), messages=messages)
+
+
 # ── Eligibility endpoints ──────────────────────────────────────────────────────
 
 @router.post(
