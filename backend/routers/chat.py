@@ -85,3 +85,29 @@ async def eligibility_all(
         eligible_count=eligible_count,
         results=[EligibilityResult(**r) for r in results],
     )
+
+
+@router.post(
+    "/eligibility/{major_id}",
+    response_model=EligibilityResponse,
+    summary="Check eligibility for a specific major",
+)
+async def eligibility_for_major(
+    major_id: UUID,
+    year: Optional[int] = Query(None),
+    user: dict = Depends(get_current_user),
+):
+    user_id: UUID = user["id"]
+    results = await check_eligibility_for_major(
+        user_id=user_id, major_id=major_id, year=year
+    )
+
+    used_year = results[0]["year"] if results else year or 0
+    eligible_count = sum(1 for r in results if r["eligible"])
+
+    return EligibilityResponse(
+        year=used_year,
+        total_projects=len(results),
+        eligible_count=eligible_count,
+        results=[EligibilityResult(**r) for r in results],
+    )
