@@ -265,3 +265,48 @@ class TcasIngestion:
                 self.stats["admission_projects"] += 1
 
         print(f"  admission_projects: {self.stats['admission_projects']} inserted/updated")
+
+    async def load_subject_requirements(self, rows: list[dict]):
+        for row in rows:
+            univ_slug = row["university_slug"].strip()
+            fac_slug = row["faculty_slug"].strip()
+            major_slug = row["major_slug"].strip()
+            round_number = int(row["round_number"])
+            year = int(row["year"])
+            project_slug = row["project_slug"].strip()
+            subject = row["subject"].strip()
+            min_score = _parse_decimal(row.get("min_score", ""))
+            weight_percent = _parse_decimal(row.get("weight_percent", ""))
+
+            if subject not in VALID_SUBJECTS:
+                print(f"  ERROR: unknown subject '{subject}' (not in controlled vocabulary)", file=sys.stderr)
+                self.stats["errors"] += 1
+                continue
+
+            major_id = self._majors.get((univ_slug, fac_slug, major_slug))
+            round_id = self._tcas_rounds.get((major_id, round_number, year)) if major_id else None
+            ap_id = self._admission_projects.get((round_id, project_slug)) if round_id else None
+
+            if not ap_id:
+                print(f"  ERROR: unknown admission_project '{project_slug}' for subject_requirement '{subject}'", file=sys.stderr)
+                self.stats["errors"] += 1
+                continue
+
+            existing = await self._fetchrow(
+                "SELECT id FROM subject_requirements WHERE admission_project_id = $1 AND subject = $2",
+                ap_id, subject,
+            )
+            if existing:
+                await self._exec(
+                    "UPDATE subject_requirements SET min_score = $1, weight_percent = $2 WHERE id = $3",
+                    min_score, weight_percent, existing["id"],
+                )
+            else:
+                await self._exec(
+                    """INSERT INTO subject_requirements (admission_project_id, subject, min_score, weight_percent)
+                       VALUES ($1, $2, $3, $4)""",
+                    ap_id, subject, min_score, weight_percent,
+                )
+                self.stats["subject_requirements"] += 1
+
+        print(f"  subject_requirements: {self.stats['subject_requirements']} inserted/updated")
