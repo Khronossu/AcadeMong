@@ -48,3 +48,21 @@ async def handle_dreamer_message(
     cfg = get_model_config("dreamer_chat")
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": content}]
     return await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
+
+
+async def handle_tcas_message(
+    user_id: UUID,
+    session_id: UUID,
+    content: str,
+    history: list[dict],
+) -> str:
+    """Generate a Flow B (TCAS advisor) response grounded in SQL eligibility data.
+
+    Phase 6 RAG hook: insert retrieval between check_eligibility and compose_tcas_prompt.
+    """
+    profile = await _load_user_profile(user_id)
+    eligibility = await check_eligibility(user_id=user_id)
+    system_prompt = compose_tcas_prompt(profile, eligibility)
+    cfg = get_model_config("tcas_chat")
+    messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": content}]
+    return await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
