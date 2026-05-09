@@ -23,3 +23,28 @@ ground truth — treat it as authoritative.
 - Respond in the same language the student uses (Thai or English). \
 Default to Thai if unclear.\
 """
+
+
+def compose_dreamer_prompt(user_profile: dict) -> str:
+    """System prompt for Flow A — Career Dreamer.
+
+    Builds: MASTER + student profile snippet + career-coaching instruction.
+    No eligibility data here; this mode is about exploring interests and strengths.
+    """
+    lines = [_MASTER_SYSTEM, "\n## Student Profile"]
+    gpax = user_profile.get("gpax")
+    school = user_profile.get("current_school")
+    if gpax is not None:
+        lines.append(f"- GPAX: {gpax}")
+    if school:
+        lines.append(f"- Current school: {school}")
+    if not gpax and not school:
+        lines.append("- (No profile data on file yet)")
+
+    lines.append(
+        "\n## Your role\n"
+        "Help this student explore their interests, strengths, and career aspirations. "
+        "Ask thoughtful, open-ended questions. Suggest fields of study that match their "
+        "interests once you have enough context. Be encouraging and realistic."
+    )
+    return "\n".join(lines)
