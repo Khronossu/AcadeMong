@@ -124,3 +124,69 @@ async def get_profile(user: dict = Depends(get_current_user)):
         gpax=float(profile["gpax"]) if profile["gpax"] is not None else None,
         test_scores=[TestScoreOut(**dict(s)) for s in scores],
     )
+
+
+@router.put(
+    "/me",
+    response_model=ProfileResponse,
+    summary="Upsert profile and replace test scores",
+)
+async def update_profile(
+    req: ProfileUpdateRequest,
+    user: dict = Depends(get_current_user),
+):
+    user_id: UUID = user["id"]
+
+    existing = await fetchrow(
+        "SELECT id FROM user_profiles WHERE user_id = $1", user_id
+    )
+    if existing:
+        await execute(
+            """UPDATE user_profiles
+               SET first_name = COALESCE($1, first_name),
+                   last_name = COALESCE($2, last_name),
+                   date_of_birth = COALESCE($3, date_of_birth),
+                   avatar_url = COALESCE($4, avatar_url),
+                   address = COALESCE($5, address),
+                   sub_district = COALESCE($6, sub_district),
+                   district = COALESCE($7, district),
+                   province = COALESCE($8, province),
+                   postal_code = COALESCE($9, postal_code),
+                   current_school = COALESCE($10, current_school),
+                   gpax = COALESCE($11, gpax),
+                   updated_at = CURRENT_TIMESTAMP
+               WHERE user_id = $12""",
+            req.first_name, req.last_name, req.date_of_birth,
+            req.avatar_url, req.address, req.sub_district,
+            req.district, req.province, req.postal_code,
+            req.current_school,
+            Decimal(str(req.gpax)) if req.gpax is not None else None,
+            user_id,
+        )
+    else:
+        await execute(
+            """INSERT INTO user_profiles
+               (user_id, first_name, last_name, date_of_birth, avatar_url,
+                address, sub_district, district, province, postal_code,
+                current_school, gpax)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)""",
+            user_id,
+            req.first_name, req.last_name, req.date_of_birth,
+            req.avatar_url, req.address, req.sub_district,
+            req.district, req.province, req.postal_code,
+            req.current_school,
+            Decimal(str(req.gpax)) if req.gpax is not None else None,
+        )
+
+    if req.test_scores is not None:
+        # Upsert each score — keep the most recent per (user, subject, exam_year)
+        for ts in req.test_scores:
+            await execute(
+                """INSERT INTO user_test_scores (user_id, subject, score, exam_year)
+                   VALUES ($1, $2, $3, $4)
+                   ON CONFLICT (user_id, subject, exam_year)
+                   DO UPDATE SET score = EXCLUDED.score, updated_at = CURRENT_TIMESTAMP""",
+                user_id, ts.subject, ts.score, ts.exam_year,
+            )
+
+    return await get_profile(user=user)
