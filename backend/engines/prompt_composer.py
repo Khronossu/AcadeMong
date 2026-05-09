@@ -48,3 +48,54 @@ def compose_dreamer_prompt(user_profile: dict) -> str:
         "interests once you have enough context. Be encouraging and realistic."
     )
     return "\n".join(lines)
+
+
+def compose_tcas_prompt(user_profile: dict, eligibility_results: list[dict]) -> str:
+    """System prompt for Flow B — TCAS advisor.
+
+    Injects SQL eligibility results as ground-truth context so the model never
+    has to invent thresholds. Results are capped (10 eligible / 5 ineligible)
+    to stay within a reasonable context budget.
+    """
+    lines = [_MASTER_SYSTEM, "\n## Student Profile"]
+    gpax = user_profile.get("gpax")
+    if gpax is not None:
+        lines.append(f"- GPAX: {gpax}")
+    else:
+        lines.append("- GPAX: not on file")
+
+    eligible = [r for r in eligibility_results if r["eligible"]]
+    ineligible = [r for r in eligibility_results if not r["eligible"]]
+
+    lines.append("\n<sql_result>")
+    lines.append(f"Total projects evaluated: {len(eligibility_results)}")
+    lines.append(f"Eligible: {len(eligible)}  |  Ineligible: {len(ineligible)}")
+
+    if eligible:
+        lines.append("\nELIGIBLE PROJECTS (student meets all requirements):")
+        for r in eligible[:10]:
+            gpax_label = f"GPAX≥{r['gpax_min']}" if r["gpax_min"] else "no GPAX min"
+            lines.append(
+                f"  ✓ {r['project_name']} — {r['university']} / {r['faculty']} / {r['major']} ({gpax_label})"
+            )
+        if len(eligible) > 10:
+            lines.append(f"  ... and {len(eligible) - 10} more eligible projects")
+
+    if ineligible:
+        lines.append("\nINELIGIBLE PROJECTS (requirements not met):")
+        for r in ineligible[:5]:
+            lines.append(
+                f"  ✗ {r['project_name']} — {r['university']} / {r['faculty']} / {r['major']}"
+            )
+        if len(ineligible) > 5:
+            lines.append(f"  ... and {len(ineligible) - 5} more ineligible projects")
+
+    lines.append("</sql_result>")
+    lines.append(
+        "\n## Your role\n"
+        "Answer the student's questions about their eligibility using ONLY the data "
+        "inside <sql_result> above. Never invent or guess a threshold. "
+        "If the student asks about a project not listed, tell them it is not in the "
+        "current dataset and suggest they check mytcas.com for the latest information."
+    )
+    return "\n".join(lines)
