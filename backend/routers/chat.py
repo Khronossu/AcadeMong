@@ -1,13 +1,12 @@
-"""Chat router — eligibility query endpoint (current scope).
-
-This is the current-scope version of the chat router. It covers Flow B (TCAS
-eligibility) without RAG context — just deterministic SQL matching. Flow A
-(Career Dreamer) and RAG-augmented responses are deferred pending Phase 6/7.
+"""Chat router — conversational AI endpoints + eligibility utilities.
 
 Endpoints:
-    POST /api/chat/eligibility          — run eligibility check for current user
-    POST /api/chat/eligibility/{major_id} — scoped to a single major
-    GET  /api/chat/sessions             — list chat sessions for current user
+    POST /api/chat/session              — create a new chat session (dreamer or tcas_rag)
+    POST /api/chat/{session_id}/message — send a message, receive an AI response
+    GET  /api/chat/{session_id}/messages — fetch full message history for a session
+    POST /api/chat/eligibility          — raw SQL eligibility check (no LLM)
+    POST /api/chat/eligibility/{major_id} — scoped raw eligibility check
+    GET  /api/chat/sessions             — list user's chat sessions
 """
 
 from __future__ import annotations
@@ -15,17 +14,50 @@ from __future__ import annotations
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from auth.firebase_admin import get_current_user
 from db.postgres import execute, fetch, fetchrow
 from engines.eligibility_engine import check_eligibility, check_eligibility_for_major
+from engines.mode_selector import validate_mode
+from engines.orchestrator import handle_message
+from memory.long_term_memory import (
+    create_chat_session,
+    get_messages,
+    get_session,
+    save_message,
+)
 
 router = APIRouter()
 
 
-# ── Response models ───────────────────────────────────────────────────────────
+# ── Request / response models ─────────────────────────────────────────────────
+
+class CreateSessionRequest(BaseModel):
+    ai_mode: str
+
+
+class CreateSessionResponse(BaseModel):
+    session_id: str
+    ai_mode: str
+
+
+class SendMessageRequest(BaseModel):
+    content: str
+
+
+class MessageResponse(BaseModel):
+    role: str
+    content: str
+
+
+class HistoryResponse(BaseModel):
+    session_id: str
+    messages: list[dict]
+
+
+# ── Eligibility response models ───────────────────────────────────────────────
 
 class SubjectResult(BaseModel):
     subject: str
