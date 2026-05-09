@@ -20,3 +20,12 @@ async def create_chat_session(user_id: UUID, ai_mode: str) -> UUID:
         user_id, ai_mode,
     )
     return row["id"]
+
+
+async def save_message(session_id: UUID, role: str, content: str) -> UUID:
+    """Persist one chat_messages row and return its id."""
+    row = await fetchrow(
+        "INSERT INTO chat_messages (session_id, role, content) VALUES ($1, $2, $3) RETURNING id",
+        session_id, role, content,
+    )
+    return row["id"]
