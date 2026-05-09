@@ -449,3 +449,16 @@ async def run(data_dir: Path, dry_run: bool):
 
     finally:
         await conn.close()
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Load TCAS release data into PostgreSQL")
+    parser.add_argument("--data-dir", required=True, help="Path to extracted academong-data release directory")
+    parser.add_argument("--dry-run", action="store_true", help="Parse and validate without writing to DB")
+    args = parser.parse_args()
+
+    asyncio.run(run(Path(args.data_dir), dry_run=args.dry_run))
+
+
+if __name__ == "__main__":
+    main()
