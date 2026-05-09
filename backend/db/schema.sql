@@ -168,6 +168,23 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 );
 
 -- ==========================================
+-- 6. STUDENT TEST SCORES & HISTORICAL DATA
+-- ==========================================
+
+-- Table: user_test_scores (Student's actual exam results)
+-- One row per subject per exam year per user. Used by the eligibility engine
+-- to match against subject_requirements.min_score.
+CREATE TABLE IF NOT EXISTS user_test_scores (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+    subject     VARCHAR(50) NOT NULL, -- Must match controlled vocabulary in DATA_CONTRACT §7.1
+    score       NUMERIC(6, 2) NOT NULL,
+    exam_year   INTEGER NOT NULL,
+    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, subject, exam_year)
+);
+
+-- ==========================================
 -- INDEXES FOR PERFORMANCE
 -- ==========================================
 CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid);
