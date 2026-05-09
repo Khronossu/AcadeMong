@@ -87,6 +87,23 @@ async def eligibility_all(
     )
 
 
+@router.get(
+    "/sessions",
+    summary="List chat sessions for current user",
+)
+async def list_sessions(user: dict = Depends(get_current_user)):
+    user_id: UUID = user["id"]
+    sessions = await fetch(
+        """SELECT id, ai_mode, created_at
+           FROM chat_sessions
+           WHERE user_id = $1
+           ORDER BY created_at DESC
+           LIMIT 20""",
+        user_id,
+    )
+    return {"sessions": [dict(s) for s in sessions]}
+
+
 @router.post(
     "/eligibility/{major_id}",
     response_model=EligibilityResponse,
