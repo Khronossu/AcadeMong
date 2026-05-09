@@ -142,3 +142,53 @@ def _evaluate(proj: dict, student_gpax: Optional[float], student_scores: dict[st
         "eligible": gpax_ok and subjects_pass,
         "source_url": proj["source_url"],
     }
+
+
+async def check_eligibility(
+    user_id: UUID,
+    year: Optional[int] = None,
+) -> list[dict]:
+    """Return eligibility results for every Round 3 project for a given user.
+
+    Reads the user's GPAX from user_profiles and their test scores from
+    user_test_scores. If year is omitted, uses the most recent year in the DB.
+
+    Args:
+        user_id: The user's internal UUID.
+        year: TCAS cycle year to evaluate (e.g. 2026). Defaults to latest.
+
+    Returns:
+        List of result dicts, one per admission_project, sorted by
+        (eligible DESC, university, faculty, major).
+    """
+    profile = await fetchrow(
+        "SELECT gpax FROM user_profiles WHERE user_id = $1", user_id
+    )
+    student_gpax = float(profile["gpax"]) if profile and profile["gpax"] is not None else None
+
+    score_rows = await fetch(
+        """SELECT subject, score, exam_year
+           FROM user_test_scores
+           WHERE user_id = $1
+           ORDER BY exam_year DESC""",
+        user_id,
+    )
+    # Keep the most recent score per subject
+    student_scores: dict[str, float] = {}
+    for row in score_rows:
+        subj = row["subject"]
+        if subj not in student_scores:
+            student_scores[subj] = float(row["score"])
+
+    target_year = year or await _latest_year()
+    if target_year is None:
+        return []
+
+    projects = await _fetch_projects_with_requirements(target_year)
+    results = []
+    for proj in projects:
+        result = _evaluate(proj, student_gpax, student_scores)
+        results.append(result)
+
+    results.sort(key=lambda r: (not r["eligible"], r["university"], r["faculty"], r["major"]))
+    return results
