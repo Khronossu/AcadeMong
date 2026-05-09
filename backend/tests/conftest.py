@@ -29,7 +29,7 @@ from db.postgres import init_pool, close_pool, fetch, fetchrow, execute
 
 # ── DB pool ───────────────────────────────────────────────────────────────────
 
-@pytest.fixture(scope="session", autouse=True)
+@pytest.fixture(scope="session")
 async def db_pool():
     await init_pool()
     yield
