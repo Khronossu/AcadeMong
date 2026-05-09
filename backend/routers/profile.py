@@ -32,3 +32,55 @@ VALID_SUBJECTS = {
     "A_LEVEL_KOREAN", "A_LEVEL_SPANISH",
     "GPAX",
 }
+
+
+# ── Pydantic models ───────────────────────────────────────────────────────────
+
+class TestScoreIn(BaseModel):
+    subject: str
+    score: float = Field(ge=0, le=100)
+    exam_year: int = Field(ge=2020, le=2100)
+
+    @field_validator("subject")
+    @classmethod
+    def subject_must_be_valid(cls, v: str) -> str:
+        if v not in VALID_SUBJECTS:
+            raise ValueError(f"Unknown subject '{v}'. Must be one of the controlled vocabulary.")
+        return v
+
+
+class ProfileUpdateRequest(BaseModel):
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    avatar_url: Optional[str] = None
+    address: Optional[str] = None
+    sub_district: Optional[str] = None
+    district: Optional[str] = None
+    province: Optional[str] = None
+    postal_code: Optional[str] = None
+    current_school: Optional[str] = None
+    gpax: Optional[float] = Field(None, ge=0.0, le=4.0)
+    test_scores: Optional[list[TestScoreIn]] = None
+
+
+class TestScoreOut(BaseModel):
+    subject: str
+    score: float
+    exam_year: int
+
+
+class ProfileResponse(BaseModel):
+    user_id: UUID
+    first_name: Optional[str]
+    last_name: Optional[str]
+    date_of_birth: Optional[date]
+    avatar_url: Optional[str]
+    address: Optional[str]
+    sub_district: Optional[str]
+    district: Optional[str]
+    province: Optional[str]
+    postal_code: Optional[str]
+    current_school: Optional[str]
+    gpax: Optional[float]
+    test_scores: list[TestScoreOut]
