@@ -213,3 +213,53 @@ CREATE INDEX IF NOT EXISTS idx_admission_projects_round ON admission_projects(tc
 CREATE INDEX IF NOT EXISTS idx_user_test_scores_user ON user_test_scores(user_id);
 CREATE INDEX IF NOT EXISTS idx_historical_cutoffs_project ON historical_cutoffs(admission_project_id);
 CREATE INDEX IF NOT EXISTS idx_historical_cutoffs_current ON historical_cutoffs(admission_project_id, year, score_type) WHERE effective_to IS NULL;
+
+-- ==========================================
+-- ALTER: admission_projects — round_type + round_metadata
+-- ==========================================
+
+ALTER TABLE admission_projects
+    ADD COLUMN IF NOT EXISTS round_type      VARCHAR(30),
+    ADD COLUMN IF NOT EXISTS round_metadata  JSONB;
+
+-- Trigger: round_type must match tcas_rounds.round_number (NULL = permissive).
+CREATE OR REPLACE FUNCTION check_admission_round_type_matches()
+RETURNS TRIGGER AS $$
+DECLARE
+    expected_round INTEGER;
+    actual_round   INTEGER;
+BEGIN
+    IF NEW.round_type IS NULL THEN
+        RETURN NEW;
+    END IF;
+
+    expected_round := CASE NEW.round_type
+        WHEN 'portfolio'  THEN 1
+        WHEN 'quota'      THEN 2
+        WHEN 'admission'  THEN 3
+        WHEN 'direct'     THEN 4
+        ELSE NULL
+    END;
+
+    IF expected_round IS NULL THEN
+        RAISE EXCEPTION 'admission_projects.round_type must be one of portfolio|quota|admission|direct, got %', NEW.round_type;
+    END IF;
+
+    SELECT round_number INTO actual_round
+      FROM tcas_rounds
+     WHERE id = NEW.tcas_round_id;
+
+    IF actual_round IS DISTINCT FROM expected_round THEN
+        RAISE EXCEPTION 'admission_projects.round_type=% expects tcas_rounds.round_number=%, got %',
+            NEW.round_type, expected_round, actual_round;
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_admission_round_type_matches ON admission_projects;
+CREATE TRIGGER trg_admission_round_type_matches
+    BEFORE INSERT OR UPDATE ON admission_projects
+    FOR EACH ROW
+    EXECUTE FUNCTION check_admission_round_type_matches();
