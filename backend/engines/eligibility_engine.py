@@ -99,3 +99,46 @@ async def _fetch_projects_with_requirements(
             "requirements": req_map.get(p["ap_id"], []),
         })
     return result
+
+
+def _evaluate(proj: dict, student_gpax: Optional[float], student_scores: dict[str, float]) -> dict:
+    gpax_min = float(proj["gpax_min"]) if proj["gpax_min"] is not None else None
+    gpax_ok = True
+    if gpax_min is not None:
+        gpax_ok = student_gpax is not None and student_gpax >= gpax_min
+
+    subject_results = []
+    subjects_pass = True
+    for req in proj["requirements"]:
+        subj = req["subject"]
+        min_score = float(req["min_score"]) if req["min_score"] is not None else None
+        student_score = student_scores.get(subj)
+        if min_score is not None:
+            ok = student_score is not None and student_score >= min_score
+            if not ok:
+                subjects_pass = False
+        else:
+            ok = True  # no minimum — the subject is weighted but has no floor
+        subject_results.append({
+            "subject": subj,
+            "min_score": min_score,
+            "student_score": student_score,
+            "weight_percent": float(req["weight_percent"]) if req["weight_percent"] is not None else None,
+            "ok": ok,
+        })
+
+    return {
+        "admission_project_id": str(proj["ap_id"]),
+        "project_name": proj["project_name"],
+        "major": proj["major_name"],
+        "faculty": proj["faculty_name"],
+        "university": proj["university_name"],
+        "round_number": proj["round_number"],
+        "year": proj["year"],
+        "seats": proj["seats"],
+        "gpax_min": gpax_min,
+        "gpax_ok": gpax_ok,
+        "subject_results": subject_results,
+        "eligible": gpax_ok and subjects_pass,
+        "source_url": proj["source_url"],
+    }
