@@ -56,3 +56,32 @@ class EligibilityResponse(BaseModel):
     total_projects: int
     eligible_count: int
     results: list[EligibilityResult]
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@router.post(
+    "/eligibility",
+    response_model=EligibilityResponse,
+    summary="Check eligibility across all Round 3 admission projects",
+    description=(
+        "Uses the student's saved GPAX and test scores to evaluate every "
+        "Round 3 admission project for the given year. Purely SQL — no LLM."
+    ),
+)
+async def eligibility_all(
+    year: Optional[int] = Query(None, description="TCAS cycle year (defaults to latest in DB)"),
+    user: dict = Depends(get_current_user),
+):
+    user_id: UUID = user["id"]
+    results = await check_eligibility(user_id=user_id, year=year)
+
+    used_year = results[0]["year"] if results else year or 0
+    eligible_count = sum(1 for r in results if r["eligible"])
+
+    return EligibilityResponse(
+        year=used_year,
+        total_projects=len(results),
+        eligible_count=eligible_count,
+        results=[EligibilityResult(**r) for r in results],
+    )
