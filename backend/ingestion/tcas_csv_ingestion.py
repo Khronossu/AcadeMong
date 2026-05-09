@@ -211,3 +211,57 @@ class TcasIngestion:
                 self.stats["tcas_rounds"] += 1
 
         print(f"  tcas_rounds: {self.stats['tcas_rounds']} inserted/updated")
+
+    async def load_admission_projects(self, rows: list[dict]):
+        for row in rows:
+            univ_slug = row["university_slug"].strip()
+            fac_slug = row["faculty_slug"].strip()
+            major_slug = row["major_slug"].strip()
+            round_number = int(row["round_number"])
+            year = int(row["year"])
+            project_slug = row["project_slug"].strip()
+            project_name = row["project_name"].strip()
+            seats = _parse_int(row.get("seats", ""))
+            gpax_min = _parse_decimal(row.get("gpax_min", ""))
+            accepts_ged = _parse_bool(row.get("accepts_ged", "false"))
+            specific_conditions = row.get("specific_conditions", "").strip() or None
+            source_url = row.get("source_url", "").strip() or None
+
+            major_id = self._majors.get((univ_slug, fac_slug, major_slug))
+            if not major_id:
+                print(f"  ERROR: unknown major for admission_project '{project_slug}'", file=sys.stderr)
+                self.stats["errors"] += 1
+                continue
+
+            round_id = self._tcas_rounds.get((major_id, round_number, year))
+            if not round_id:
+                print(f"  ERROR: missing tcas_round for admission_project '{project_slug}' ({year} R{round_number})", file=sys.stderr)
+                self.stats["errors"] += 1
+                continue
+
+            key = (round_id, project_slug)
+            existing = await self._fetchrow(
+                "SELECT id FROM admission_projects WHERE tcas_round_id = $1 AND project_name = $2",
+                round_id, project_name,
+            )
+            if existing:
+                self._admission_projects[key] = existing["id"]
+                await self._exec(
+                    """UPDATE admission_projects
+                       SET seats = $1, gpax_min = $2, accepts_ged = $3,
+                           specific_conditions = $4, source_url = $5
+                       WHERE id = $6""",
+                    seats, gpax_min, accepts_ged, specific_conditions, source_url, existing["id"],
+                )
+            else:
+                if not self.dry_run:
+                    ap_id = await self.conn.fetchval(
+                        """INSERT INTO admission_projects
+                           (tcas_round_id, project_name, seats, gpax_min, accepts_ged, specific_conditions, source_url)
+                           VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id""",
+                        round_id, project_name, seats, gpax_min, accepts_ged, specific_conditions, source_url,
+                    )
+                    self._admission_projects[key] = ap_id
+                self.stats["admission_projects"] += 1
+
+        print(f"  admission_projects: {self.stats['admission_projects']} inserted/updated")
