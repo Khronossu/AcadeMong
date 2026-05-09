@@ -179,3 +179,35 @@ class TcasIngestion:
                 self.stats["majors"] += 1
 
         print(f"  majors: {self.stats['majors']} inserted/updated")
+
+    async def load_tcas_rounds(self, rows: list[dict]):
+        for row in rows:
+            univ_slug = row["university_slug"].strip()
+            fac_slug = row["faculty_slug"].strip()
+            major_slug = row["major_slug"].strip()
+            round_number = int(row["round_number"])
+            year = int(row["year"])
+
+            major_id = self._majors.get((univ_slug, fac_slug, major_slug))
+            if not major_id:
+                print(f"  ERROR: unknown major '{univ_slug}/{fac_slug}/{major_slug}' for tcas_round", file=sys.stderr)
+                self.stats["errors"] += 1
+                continue
+
+            key = (major_id, round_number, year)
+            existing = await self._fetchrow(
+                "SELECT id FROM tcas_rounds WHERE major_id = $1 AND round_number = $2 AND year = $3",
+                major_id, round_number, year,
+            )
+            if existing:
+                self._tcas_rounds[key] = existing["id"]
+            else:
+                if not self.dry_run:
+                    r_id = await self.conn.fetchval(
+                        "INSERT INTO tcas_rounds (major_id, round_number, year) VALUES ($1, $2, $3) RETURNING id",
+                        major_id, round_number, year,
+                    )
+                    self._tcas_rounds[key] = r_id
+                self.stats["tcas_rounds"] += 1
+
+        print(f"  tcas_rounds: {self.stats['tcas_rounds']} inserted/updated")
