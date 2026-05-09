@@ -210,3 +210,6 @@ CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id);
 CREATE INDEX IF NOT EXISTS idx_career_catalog_industry ON career_catalog(industry_group_id);
 CREATE INDEX IF NOT EXISTS idx_admission_projects_round ON admission_projects(tcas_round_id);
+CREATE INDEX IF NOT EXISTS idx_user_test_scores_user ON user_test_scores(user_id);
+CREATE INDEX IF NOT EXISTS idx_historical_cutoffs_project ON historical_cutoffs(admission_project_id);
+CREATE INDEX IF NOT EXISTS idx_historical_cutoffs_current ON historical_cutoffs(admission_project_id, year, score_type) WHERE effective_to IS NULL;
