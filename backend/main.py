@@ -5,6 +5,7 @@ import httpx
 from routers.models import router as models_router
 from routers.auth import router as auth_router
 from routers.profile import router as profile_router
+from routers.chat import router as chat_router
 from contextlib import asynccontextmanager
 from db.postgres import init_pool as init_postgres_pool, close_pool as close_postgres_pool, ping
 from memory.session_memory import init_redis_pool, close_redis_pool
@@ -31,6 +32,7 @@ app.add_middleware(
 
 app.include_router(auth_router, prefix="/api/auth", tags=["Authentication"])
 app.include_router(profile_router, prefix="/api/profile", tags=["Profile"])
+app.include_router(chat_router, prefix="/api/chat", tags=["Chat"])
 app.include_router(models_router, prefix="/api/models", tags=["Models"])
 
 async def _check_postgres() -> str:
