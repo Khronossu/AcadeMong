@@ -71,3 +71,14 @@ async def get_chat_window(user_id: str, session_id: str) -> list[dict]:
         raise ConnectionError("Redis pool is not initialized.")
     raw = await redis_pool.get(f"session:{user_id}:{session_id}:window")
     return json.loads(raw) if raw else []
+
+
+async def set_chat_window(user_id: str, session_id: str, messages: list[dict], ttl: int = 7200):
+    """Overwrite the message window in Redis. TTL defaults to 2 hours."""
+    if not redis_pool:
+        raise ConnectionError("Redis pool is not initialized.")
+    await redis_pool.set(
+        f"session:{user_id}:{session_id}:window",
+        json.dumps(messages, default=_session_serializer),
+        ex=ttl,
+    )
