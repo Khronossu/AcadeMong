@@ -168,67 +168,61 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 );
 
 -- ==========================================
+-- 6. STUDENT TEST SCORES & HISTORICAL DATA
+-- ==========================================
+
+-- Table: user_test_scores (Student's actual exam results)
+-- One row per subject per exam year per user. Used by the eligibility engine
+-- to match against subject_requirements.min_score.
+CREATE TABLE IF NOT EXISTS user_test_scores (
+    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
+    subject     VARCHAR(50) NOT NULL, -- Must match controlled vocabulary in DATA_CONTRACT §7.1
+    score       NUMERIC(6, 2) NOT NULL,
+    exam_year   INTEGER NOT NULL,
+    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, subject, exam_year)
+);
+
+-- Table: historical_cutoffs (SCD Type 2 — year-over-year cutoff statistics)
+-- Producer emits current values; ingestion script manages effective_from/effective_to.
+-- Used to show safety margin trends ("last year's cutoff was X, you're at Y").
+CREATE TABLE IF NOT EXISTS historical_cutoffs (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    admission_project_id UUID REFERENCES admission_projects(id) ON DELETE CASCADE,
+    year                INTEGER NOT NULL,        -- TCAS admission cycle year
+    score_type          VARCHAR(50) NOT NULL,    -- Controlled vocab: DATA_CONTRACT §7.2
+    min_admitted_score  NUMERIC(8, 2),
+    max_admitted_score  NUMERIC(8, 2),
+    median_score        NUMERIC(8, 2),
+    applicants_count    INTEGER,
+    accepted_count      INTEGER,
+    source_url          TEXT NOT NULL,
+    effective_from      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    effective_to        TIMESTAMP WITH TIME ZONE,  -- NULL = current record
+    UNIQUE(admission_project_id, year, score_type, effective_from)
+);
+
+-- ==========================================
 -- INDEXES FOR PERFORMANCE
 -- ==========================================
 CREATE INDEX IF NOT EXISTS idx_users_firebase_uid ON users(firebase_uid);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id ON chat_messages(session_id);
 CREATE INDEX IF NOT EXISTS idx_career_catalog_industry ON career_catalog(industry_group_id);
 CREATE INDEX IF NOT EXISTS idx_admission_projects_round ON admission_projects(tcas_round_id);
-
--- ==========================================
--- 6. DATA/RAG EXTENSION (propose_change.md §4)
--- ==========================================
-
--- Table: user_test_scores — per-subject TCAS scores, long format.
--- See propose_change.md §4.1. Replaces a denormalized column-per-test design.
-CREATE TABLE IF NOT EXISTS user_test_scores (
-    id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
-    test_code   VARCHAR(30) NOT NULL, -- 'TGAT1', 'TPAT3', 'A_LEVEL_MATH1', etc.
-    score       NUMERIC(6, 2) NOT NULL,
-    exam_year   INTEGER NOT NULL,
-    created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    updated_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE (user_id, test_code, exam_year)
-);
 CREATE INDEX IF NOT EXISTS idx_user_test_scores_user ON user_test_scores(user_id);
+CREATE INDEX IF NOT EXISTS idx_historical_cutoffs_project ON historical_cutoffs(admission_project_id);
+CREATE INDEX IF NOT EXISTS idx_historical_cutoffs_current ON historical_cutoffs(admission_project_id, year, score_type) WHERE effective_to IS NULL;
 
--- Table: historical_cutoffs — SCD Type 2 empirical cutoff history.
--- See propose_change.md §4.2 (post-review update). `year` is admission cycle;
--- effective_from/to track when WE observed this value (universities restate).
-CREATE TABLE IF NOT EXISTS historical_cutoffs (
-    id                   UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-    admission_project_id UUID REFERENCES admission_projects(id) ON DELETE CASCADE,
-    year                 INTEGER NOT NULL,
-    score_type           VARCHAR(30) NOT NULL, -- 'composite_weighted' | 'TGAT_total' | 'TPAT1' | ...
-    min_admitted_score   NUMERIC(6, 2),
-    max_admitted_score   NUMERIC(6, 2),
-    median_score         NUMERIC(6, 2),
-    applicants_count     INTEGER,
-    accepted_count       INTEGER,
-    source_url           TEXT,
-    -- SCD Type 2 versioning
-    effective_from       TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    effective_to         TIMESTAMP WITH TIME ZONE, -- NULL = still current
-    is_current           BOOLEAN NOT NULL DEFAULT TRUE,
-    created_at           TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
-);
--- At most one CURRENT row per (project, year, score_type).
--- Superseded rows unconstrained so history accumulates.
-CREATE UNIQUE INDEX IF NOT EXISTS uq_historical_cutoffs_current
-    ON historical_cutoffs(admission_project_id, year, score_type)
-    WHERE is_current;
-CREATE INDEX IF NOT EXISTS idx_historical_cutoffs_project
-    ON historical_cutoffs(admission_project_id, year);
+-- ==========================================
+-- ALTER: admission_projects — round_type + round_metadata
+-- ==========================================
 
--- ALTER: admission_projects — add round_type + round_metadata (propose_change.md §4.3)
 ALTER TABLE admission_projects
     ADD COLUMN IF NOT EXISTS round_type      VARCHAR(30),
     ADD COLUMN IF NOT EXISTS round_metadata  JSONB;
 
--- Consistency trigger: round_type must match the linked tcas_rounds.round_number.
--- CHECK constraints can't subquery, so enforced as a trigger. Permissive:
--- NULL round_type is allowed (ingestion may set it after row creation).
+-- Trigger: round_type must match tcas_rounds.round_number (NULL = permissive).
 CREATE OR REPLACE FUNCTION check_admission_round_type_matches()
 RETURNS TRIGGER AS $$
 DECLARE
@@ -236,7 +230,7 @@ DECLARE
     actual_round   INTEGER;
 BEGIN
     IF NEW.round_type IS NULL THEN
-        RETURN NEW; -- permissive: unset is allowed
+        RETURN NEW;
     END IF;
 
     expected_round := CASE NEW.round_type
