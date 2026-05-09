@@ -310,3 +310,80 @@ class TcasIngestion:
                 self.stats["subject_requirements"] += 1
 
         print(f"  subject_requirements: {self.stats['subject_requirements']} inserted/updated")
+
+    async def load_historical_cutoffs(self, rows: list[dict]):
+        """SCD Type 2: close the old record and insert a new one when data changes."""
+        now = datetime.now(timezone.utc)
+
+        for row in rows:
+            univ_slug = row["university_slug"].strip()
+            fac_slug = row["faculty_slug"].strip()
+            major_slug = row["major_slug"].strip()
+            round_number = int(row["round_number"])
+            year = int(row["year"])
+            project_slug = row["project_slug"].strip()
+            score_type = row["score_type"].strip()
+            source_url = row.get("source_url", "").strip()
+
+            if score_type not in VALID_SCORE_TYPES:
+                print(f"  ERROR: unknown score_type '{score_type}'", file=sys.stderr)
+                self.stats["errors"] += 1
+                continue
+
+            min_score = _parse_decimal(row.get("min_admitted_score", ""))
+            max_score = _parse_decimal(row.get("max_admitted_score", ""))
+            median = _parse_decimal(row.get("median_score", ""))
+            applicants = _parse_int(row.get("applicants_count", ""))
+            accepted = _parse_int(row.get("accepted_count", ""))
+
+            major_id = self._majors.get((univ_slug, fac_slug, major_slug))
+            round_id = self._tcas_rounds.get((major_id, round_number, year)) if major_id else None
+            ap_id = self._admission_projects.get((round_id, project_slug)) if round_id else None
+
+            if not ap_id:
+                print(f"  ERROR: unknown admission_project for historical_cutoff '{project_slug}' {year}", file=sys.stderr)
+                self.stats["errors"] += 1
+                continue
+
+            current = await self._fetchrow(
+                """SELECT id, min_admitted_score, max_admitted_score, median_score,
+                          applicants_count, accepted_count
+                   FROM historical_cutoffs
+                   WHERE admission_project_id = $1 AND year = $2 AND score_type = $3
+                     AND effective_to IS NULL""",
+                ap_id, year, score_type,
+            )
+
+            if current:
+                changed = (
+                    current["min_admitted_score"] != min_score
+                    or current["max_admitted_score"] != max_score
+                    or current["median_score"] != median
+                    or current["applicants_count"] != applicants
+                    or current["accepted_count"] != accepted
+                )
+                if not changed:
+                    self.stats["historical_cutoffs_skipped"] += 1
+                    continue
+
+                await self._exec(
+                    "UPDATE historical_cutoffs SET effective_to = $1 WHERE id = $2",
+                    now, current["id"],
+                )
+                self.stats["historical_cutoffs_closed"] += 1
+
+            await self._exec(
+                """INSERT INTO historical_cutoffs
+                   (admission_project_id, year, score_type,
+                    min_admitted_score, max_admitted_score, median_score,
+                    applicants_count, accepted_count, source_url, effective_from)
+                   VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)""",
+                ap_id, year, score_type,
+                min_score, max_score, median,
+                applicants, accepted, source_url, now,
+            )
+            self.stats["historical_cutoffs_inserted"] += 1
+
+        print(f"  historical_cutoffs: {self.stats['historical_cutoffs_inserted']} inserted, "
+              f"{self.stats['historical_cutoffs_closed']} versions closed, "
+              f"{self.stats['historical_cutoffs_skipped']} unchanged")
