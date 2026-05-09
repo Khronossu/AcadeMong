@@ -60,3 +60,34 @@ async def get_user_session(user_id: str) -> dict | None:
     session_key = f"session:{user_id}:profile"
     raw = await redis_pool.get(session_key)
     return json.loads(raw) if raw else None
+
+
+_WINDOW_SIZE = 10  # max messages kept hot in Redis per session
+
+
+async def get_chat_window(user_id: str, session_id: str) -> list[dict]:
+    """Return the in-session message window from Redis (empty list if not found)."""
+    if not redis_pool:
+        raise ConnectionError("Redis pool is not initialized.")
+    raw = await redis_pool.get(f"session:{user_id}:{session_id}:window")
+    return json.loads(raw) if raw else []
+
+
+async def set_chat_window(user_id: str, session_id: str, messages: list[dict], ttl: int = 7200):
+    """Overwrite the message window in Redis. TTL defaults to 2 hours."""
+    if not redis_pool:
+        raise ConnectionError("Redis pool is not initialized.")
+    await redis_pool.set(
+        f"session:{user_id}:{session_id}:window",
+        json.dumps(messages, default=_session_serializer),
+        ex=ttl,
+    )
+
+
+async def append_to_chat_window(user_id: str, session_id: str, role: str, content: str, ttl: int = 7200):
+    """Append one message to the window, trimming to _WINDOW_SIZE most recent."""
+    messages = await get_chat_window(user_id, session_id)
+    messages.append({"role": role, "content": content})
+    if len(messages) > _WINDOW_SIZE:
+        messages = messages[-_WINDOW_SIZE:]
+    await set_chat_window(user_id, session_id, messages, ttl=ttl)

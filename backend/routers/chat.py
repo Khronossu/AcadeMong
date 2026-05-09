@@ -1,13 +1,12 @@
-"""Chat router — eligibility query endpoint (current scope).
-
-This is the current-scope version of the chat router. It covers Flow B (TCAS
-eligibility) without RAG context — just deterministic SQL matching. Flow A
-(Career Dreamer) and RAG-augmented responses are deferred pending Phase 6/7.
+"""Chat router — conversational AI endpoints + eligibility utilities.
 
 Endpoints:
-    POST /api/chat/eligibility          — run eligibility check for current user
-    POST /api/chat/eligibility/{major_id} — scoped to a single major
-    GET  /api/chat/sessions             — list chat sessions for current user
+    POST /api/chat/session              — create a new chat session (dreamer or tcas_rag)
+    POST /api/chat/{session_id}/message — send a message, receive an AI response
+    GET  /api/chat/{session_id}/messages — fetch full message history for a session
+    POST /api/chat/eligibility          — raw SQL eligibility check (no LLM)
+    POST /api/chat/eligibility/{major_id} — scoped raw eligibility check
+    GET  /api/chat/sessions             — list user's chat sessions
 """
 
 from __future__ import annotations
@@ -15,17 +14,50 @@ from __future__ import annotations
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 
 from auth.firebase_admin import get_current_user
 from db.postgres import execute, fetch, fetchrow
 from engines.eligibility_engine import check_eligibility, check_eligibility_for_major
+from engines.mode_selector import validate_mode
+from engines.orchestrator import handle_message
+from memory.long_term_memory import (
+    create_chat_session,
+    get_messages,
+    get_session,
+    save_message,
+)
 
 router = APIRouter()
 
 
-# ── Response models ───────────────────────────────────────────────────────────
+# ── Request / response models ─────────────────────────────────────────────────
+
+class CreateSessionRequest(BaseModel):
+    ai_mode: str
+
+
+class CreateSessionResponse(BaseModel):
+    session_id: str
+    ai_mode: str
+
+
+class SendMessageRequest(BaseModel):
+    content: str
+
+
+class MessageResponse(BaseModel):
+    role: str
+    content: str
+
+
+class HistoryResponse(BaseModel):
+    session_id: str
+    messages: list[dict]
+
+
+# ── Eligibility response models ───────────────────────────────────────────────
 
 class SubjectResult(BaseModel):
     subject: str
@@ -58,7 +90,65 @@ class EligibilityResponse(BaseModel):
     results: list[EligibilityResult]
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# ── Chat endpoints ────────────────────────────────────────────────────────────
+
+@router.post(
+    "/session",
+    response_model=CreateSessionResponse,
+    summary="Create a new chat session",
+    description="ai_mode must be 'dreamer' (Flow A) or 'tcas_rag' (Flow B).",
+)
+async def create_session(
+    body: CreateSessionRequest,
+    user: dict = Depends(get_current_user),
+):
+    try:
+        mode = validate_mode(body.ai_mode)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    session_id = await create_chat_session(user["id"], mode)
+    return CreateSessionResponse(session_id=str(session_id), ai_mode=mode)
+
+
+@router.post(
+    "/{session_id}/message",
+    response_model=MessageResponse,
+    summary="Send a message and receive an AI response",
+)
+async def send_message(
+    session_id: UUID,
+    body: SendMessageRequest,
+    user: dict = Depends(get_current_user),
+):
+    session = await get_session(session_id)
+    if not session or session["user_id"] != user["id"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    response_text = await handle_message(
+        session_id=session_id,
+        user_id=user["id"],
+        ai_mode=session["ai_mode"],
+        content=body.content,
+    )
+    return MessageResponse(role="assistant", content=response_text)
+
+
+@router.get(
+    "/{session_id}/messages",
+    response_model=HistoryResponse,
+    summary="Fetch full message history for a session",
+)
+async def get_message_history(
+    session_id: UUID,
+    user: dict = Depends(get_current_user),
+):
+    session = await get_session(session_id)
+    if not session or session["user_id"] != user["id"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    messages = await get_messages(session_id)
+    return HistoryResponse(session_id=str(session_id), messages=messages)
+
+
+# ── Eligibility endpoints ──────────────────────────────────────────────────────
 
 @router.post(
     "/eligibility",
