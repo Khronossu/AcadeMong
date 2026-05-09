@@ -23,3 +23,36 @@ from db.postgres import execute, fetch, fetchrow
 from engines.eligibility_engine import check_eligibility, check_eligibility_for_major
 
 router = APIRouter()
+
+
+# ── Response models ───────────────────────────────────────────────────────────
+
+class SubjectResult(BaseModel):
+    subject: str
+    min_score: Optional[float]
+    student_score: Optional[float]
+    weight_percent: Optional[float]
+    ok: bool
+
+
+class EligibilityResult(BaseModel):
+    admission_project_id: str
+    project_name: str
+    major: str
+    faculty: str
+    university: str
+    round_number: int
+    year: int
+    seats: Optional[int]
+    gpax_min: Optional[float]
+    gpax_ok: bool
+    subject_results: list[SubjectResult]
+    eligible: bool
+    source_url: Optional[str]
+
+
+class EligibilityResponse(BaseModel):
+    year: int
+    total_projects: int
+    eligible_count: int
+    results: list[EligibilityResult]
