@@ -87,3 +87,29 @@ class TcasIngestion:
 
     async def _fetchrow(self, query: str, *args):
         return await self.conn.fetchrow(query, *args)
+
+    async def load_universities(self, rows: list[dict]):
+        for row in rows:
+            slug = row["university_slug"].strip()
+            name = row["name"].strip()
+            location = row.get("location", "").strip() or None
+
+            existing = await self._fetchrow(
+                "SELECT id FROM universities WHERE name = $1", name
+            )
+            if existing:
+                self._universities[slug] = existing["id"]
+                await self._exec(
+                    "UPDATE universities SET location = COALESCE($1, location) WHERE id = $2",
+                    location, existing["id"],
+                )
+            else:
+                if not self.dry_run:
+                    row_id = await self.conn.fetchval(
+                        "INSERT INTO universities (name, location) VALUES ($1, $2) RETURNING id",
+                        name, location,
+                    )
+                    self._universities[slug] = row_id
+                self.stats["universities"] += 1
+
+        print(f"  universities: {self.stats['universities']} inserted/updated")
