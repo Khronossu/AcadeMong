@@ -42,3 +42,15 @@ async def get_session(session_id: UUID) -> dict | None:
         session_id,
     )
     return dict(row) if row else None
+
+
+async def get_messages(session_id: UUID) -> list[dict]:
+    """Return all chat_messages for a session, ordered oldest-first."""
+    rows = await fetch(
+        """SELECT id, role, content, created_at
+           FROM chat_messages
+           WHERE session_id = $1
+           ORDER BY created_at""",
+        session_id,
+    )
+    return [dict(r) for r in rows]
