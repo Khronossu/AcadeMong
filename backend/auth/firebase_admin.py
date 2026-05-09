@@ -1,10 +1,16 @@
 import asyncio
 import json
 import os
+from uuid import UUID
 
 import firebase_admin
 from firebase_admin import auth, credentials
-from fastapi import HTTPException, status
+from fastapi import Depends, HTTPException, Security, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+
+from db.postgres import fetchrow
+
+_bearer = HTTPBearer()
 
 
 def initialize_firebase():
@@ -50,3 +56,27 @@ async def verify_token(token: str) -> dict:
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An error occurred during token verification: {e}",
         )
+
+
+async def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Security(_bearer),
+) -> dict:
+    """FastAPI dependency — verifies Bearer token and returns the DB user row.
+
+    Usage in a route:
+        @router.get("/me")
+        async def me(user: dict = Depends(get_current_user)):
+            return {"user_id": user["id"]}
+    """
+    decoded = await verify_token(credentials.credentials)
+    firebase_uid = decoded.get("uid")
+
+    user = await fetchrow(
+        "SELECT id, username, email FROM users WHERE firebase_uid = $1", firebase_uid
+    )
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found. Please register first.",
+        )
+    return dict(user)
