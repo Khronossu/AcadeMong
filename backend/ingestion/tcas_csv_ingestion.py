@@ -59,3 +59,31 @@ def _parse_bool(value: str) -> bool:
 def _read_csv(path: Path) -> list[dict]:
     with open(path, encoding="utf-8", newline="") as f:
         return list(csv.DictReader(f))
+
+
+# ── Ingestion class ───────────────────────────────────────────────────────────
+
+class TcasIngestion:
+    def __init__(self, conn: asyncpg.Connection, dry_run: bool = False):
+        self.conn = conn
+        self.dry_run = dry_run
+        # slug → UUID caches built as we go
+        self._universities: dict[str, UUID] = {}
+        self._faculties: dict[tuple, UUID] = {}   # (univ_slug, faculty_slug)
+        self._majors: dict[tuple, UUID] = {}       # (univ_slug, faculty_slug, major_slug)
+        self._tcas_rounds: dict[tuple, UUID] = {}  # (major_id, round_number, year)
+        self._admission_projects: dict[tuple, UUID] = {}  # (round_id, project_slug)
+        self.stats = {k: 0 for k in [
+            "universities", "faculties", "majors", "tcas_rounds",
+            "admission_projects", "subject_requirements",
+            "historical_cutoffs_inserted", "historical_cutoffs_closed", "historical_cutoffs_skipped",
+            "errors",
+        ]}
+
+    async def _exec(self, query: str, *args):
+        if self.dry_run:
+            return
+        await self.conn.execute(query, *args)
+
+    async def _fetchrow(self, query: str, *args):
+        return await self.conn.fetchrow(query, *args)
