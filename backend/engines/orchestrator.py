@@ -66,3 +66,33 @@ async def handle_tcas_message(
     cfg = get_model_config("tcas_chat")
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": content}]
     return await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
+
+
+async def handle_message(
+    session_id: UUID,
+    user_id: UUID,
+    ai_mode: str,
+    content: str,
+) -> str:
+    """Top-level dispatcher: load context → generate response → persist → return.
+
+    Order matters:
+      1. Load Redis window (fast, recent context for the model).
+      2. Generate response (the only slow step — Ollama call).
+      3. Persist to DB (durable history).
+      4. Update Redis window (so next turn has fresh context).
+    """
+    history = await get_chat_window(str(user_id), str(session_id))
+
+    if ai_mode == "dreamer":
+        response = await handle_dreamer_message(user_id, session_id, content, history)
+    else:
+        response = await handle_tcas_message(user_id, session_id, content, history)
+
+    await save_message(session_id, "user", content)
+    await save_message(session_id, "assistant", response)
+
+    await append_to_chat_window(str(user_id), str(session_id), "user", content)
+    await append_to_chat_window(str(user_id), str(session_id), "assistant", response)
+
+    return response
