@@ -60,3 +60,14 @@ async def get_user_session(user_id: str) -> dict | None:
     session_key = f"session:{user_id}:profile"
     raw = await redis_pool.get(session_key)
     return json.loads(raw) if raw else None
+
+
+_WINDOW_SIZE = 10  # max messages kept hot in Redis per session
+
+
+async def get_chat_window(user_id: str, session_id: str) -> list[dict]:
+    """Return the in-session message window from Redis (empty list if not found)."""
+    if not redis_pool:
+        raise ConnectionError("Redis pool is not initialized.")
+    raw = await redis_pool.get(f"session:{user_id}:{session_id}:window")
+    return json.loads(raw) if raw else []
