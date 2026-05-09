@@ -110,6 +110,28 @@ async def create_session(
     return CreateSessionResponse(session_id=str(session_id), ai_mode=mode)
 
 
+@router.post(
+    "/{session_id}/message",
+    response_model=MessageResponse,
+    summary="Send a message and receive an AI response",
+)
+async def send_message(
+    session_id: UUID,
+    body: SendMessageRequest,
+    user: dict = Depends(get_current_user),
+):
+    session = await get_session(session_id)
+    if not session or session["user_id"] != user["id"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    response_text = await handle_message(
+        session_id=session_id,
+        user_id=user["id"],
+        ai_mode=session["ai_mode"],
+        content=body.content,
+    )
+    return MessageResponse(role="assistant", content=response_text)
+
+
 # ── Eligibility endpoints ──────────────────────────────────────────────────────
 
 @router.post(
