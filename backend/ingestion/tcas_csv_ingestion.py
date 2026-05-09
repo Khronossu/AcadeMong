@@ -387,3 +387,65 @@ class TcasIngestion:
         print(f"  historical_cutoffs: {self.stats['historical_cutoffs_inserted']} inserted, "
               f"{self.stats['historical_cutoffs_closed']} versions closed, "
               f"{self.stats['historical_cutoffs_skipped']} unchanged")
+
+
+# ── Entry point ───────────────────────────────────────────────────────────────
+
+async def run(data_dir: Path, dry_run: bool):
+    csv_dir = data_dir / "csv"
+    if not csv_dir.exists():
+        print(f"ERROR: csv/ directory not found under {data_dir}", file=sys.stderr)
+        sys.exit(1)
+
+    required = [
+        "universities.csv", "faculties.csv", "majors.csv",
+        "tcas_rounds.csv", "admission_projects.csv", "subject_requirements.csv",
+    ]
+    missing = [f for f in required if not (csv_dir / f).exists()]
+    if missing:
+        print(f"ERROR: missing required CSV files: {missing}", file=sys.stderr)
+        sys.exit(1)
+
+    conn = await asyncpg.connect(
+        host=os.getenv("POSTGRES_HOST", "localhost"),
+        port=int(os.getenv("POSTGRES_PORT", "5432")),
+        database=os.getenv("POSTGRES_DB", "tcas_advisor"),
+        user=os.getenv("POSTGRES_USER", "admin"),
+        password=os.getenv("POSTGRES_PASSWORD", "password"),
+    )
+
+    try:
+        ingestion = TcasIngestion(conn, dry_run=dry_run)
+
+        print("Loading universities...")
+        await ingestion.load_universities(_read_csv(csv_dir / "universities.csv"))
+
+        print("Loading faculties...")
+        await ingestion.load_faculties(_read_csv(csv_dir / "faculties.csv"))
+
+        print("Loading majors...")
+        await ingestion.load_majors(_read_csv(csv_dir / "majors.csv"))
+
+        print("Loading tcas_rounds...")
+        await ingestion.load_tcas_rounds(_read_csv(csv_dir / "tcas_rounds.csv"))
+
+        print("Loading admission_projects...")
+        await ingestion.load_admission_projects(_read_csv(csv_dir / "admission_projects.csv"))
+
+        print("Loading subject_requirements...")
+        await ingestion.load_subject_requirements(_read_csv(csv_dir / "subject_requirements.csv"))
+
+        cutoffs_path = csv_dir / "historical_cutoffs.csv"
+        if cutoffs_path.exists():
+            print("Loading historical_cutoffs...")
+            await ingestion.load_historical_cutoffs(_read_csv(cutoffs_path))
+        else:
+            print("historical_cutoffs.csv not found — skipping")
+
+        print("\nDone." if not dry_run else "\nDry run complete (no data written).")
+        if ingestion.stats["errors"]:
+            print(f"WARNING: {ingestion.stats['errors']} errors encountered — check stderr", file=sys.stderr)
+            sys.exit(1)
+
+    finally:
+        await conn.close()
