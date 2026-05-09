@@ -192,3 +192,32 @@ async def check_eligibility(
 
     results.sort(key=lambda r: (not r["eligible"], r["university"], r["faculty"], r["major"]))
     return results
+
+
+async def check_eligibility_for_major(
+    user_id: UUID,
+    major_id: UUID,
+    year: Optional[int] = None,
+) -> list[dict]:
+    """Eligibility check scoped to a single major (all its Round 3 projects)."""
+    profile = await fetchrow(
+        "SELECT gpax FROM user_profiles WHERE user_id = $1", user_id
+    )
+    student_gpax = float(profile["gpax"]) if profile and profile["gpax"] is not None else None
+
+    score_rows = await fetch(
+        """SELECT subject, score FROM user_test_scores
+           WHERE user_id = $1 ORDER BY exam_year DESC""",
+        user_id,
+    )
+    student_scores: dict[str, float] = {}
+    for row in score_rows:
+        if row["subject"] not in student_scores:
+            student_scores[row["subject"]] = float(row["score"])
+
+    target_year = year or await _latest_year()
+    if target_year is None:
+        return []
+
+    projects = await _fetch_projects_with_requirements(target_year, major_id=major_id)
+    return [_evaluate(p, student_gpax, student_scores) for p in projects]
