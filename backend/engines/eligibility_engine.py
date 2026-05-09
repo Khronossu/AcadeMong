@@ -34,3 +34,8 @@ from typing import Optional
 from uuid import UUID
 
 from db.postgres import fetch, fetchrow
+
+
+async def _latest_year() -> Optional[int]:
+    row = await fetchrow("SELECT MAX(year) AS y FROM tcas_rounds")
+    return row["y"] if row else None
