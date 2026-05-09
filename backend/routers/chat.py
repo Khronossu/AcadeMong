@@ -90,7 +90,27 @@ class EligibilityResponse(BaseModel):
     results: list[EligibilityResult]
 
 
-# ── Endpoints ─────────────────────────────────────────────────────────────────
+# ── Chat endpoints ────────────────────────────────────────────────────────────
+
+@router.post(
+    "/session",
+    response_model=CreateSessionResponse,
+    summary="Create a new chat session",
+    description="ai_mode must be 'dreamer' (Flow A) or 'tcas_rag' (Flow B).",
+)
+async def create_session(
+    body: CreateSessionRequest,
+    user: dict = Depends(get_current_user),
+):
+    try:
+        mode = validate_mode(body.ai_mode)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    session_id = await create_chat_session(user["id"], mode)
+    return CreateSessionResponse(session_id=str(session_id), ai_mode=mode)
+
+
+# ── Eligibility endpoints ──────────────────────────────────────────────────────
 
 @router.post(
     "/eligibility",
