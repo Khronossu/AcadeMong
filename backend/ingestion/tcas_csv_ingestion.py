@@ -40,3 +40,22 @@ VALID_SUBJECTS = {
 }
 
 VALID_SCORE_TYPES = VALID_SUBJECTS | {"composite_weighted"}
+
+
+# ── CSV helpers ───────────────────────────────────────────────────────────────
+
+def _parse_decimal(value: str) -> Optional[float]:
+    return float(value) if value else None
+
+
+def _parse_int(value: str) -> Optional[int]:
+    return int(value) if value else None
+
+
+def _parse_bool(value: str) -> bool:
+    return value.strip().lower() == "true"
+
+
+def _read_csv(path: Path) -> list[dict]:
+    with open(path, encoding="utf-8", newline="") as f:
+        return list(csv.DictReader(f))
