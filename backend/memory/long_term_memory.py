@@ -29,3 +29,16 @@ async def save_message(session_id: UUID, role: str, content: str) -> UUID:
         session_id, role, content,
     )
     return row["id"]
+
+
+async def get_session(session_id: UUID) -> dict | None:
+    """Fetch a chat_sessions row by id, or None if not found.
+
+    Includes user_id so callers can verify ownership before exposing
+    session data to the requesting user.
+    """
+    row = await fetchrow(
+        "SELECT id, user_id, ai_mode, created_at FROM chat_sessions WHERE id = $1",
+        session_id,
+    )
+    return dict(row) if row else None
