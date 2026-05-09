@@ -34,3 +34,17 @@ async def _load_user_profile(user_id: UUID) -> dict:
         user_id,
     )
     return dict(row) if row else {}
+
+
+async def handle_dreamer_message(
+    user_id: UUID,
+    session_id: UUID,
+    content: str,
+    history: list[dict],
+) -> str:
+    """Generate a Flow A (Career Dreamer) response via Typhoon2."""
+    profile = await _load_user_profile(user_id)
+    system_prompt = compose_dreamer_prompt(profile)
+    cfg = get_model_config("dreamer_chat")
+    messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": content}]
+    return await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
