@@ -113,3 +113,33 @@ class TcasIngestion:
                 self.stats["universities"] += 1
 
         print(f"  universities: {self.stats['universities']} inserted/updated")
+
+    async def load_faculties(self, rows: list[dict]):
+        for row in rows:
+            univ_slug = row["university_slug"].strip()
+            fac_slug = row["faculty_slug"].strip()
+            name = row["name"].strip()
+            key = (univ_slug, fac_slug)
+
+            univ_id = self._universities.get(univ_slug)
+            if not univ_id:
+                print(f"  ERROR: unknown university_slug '{univ_slug}' for faculty '{name}'", file=sys.stderr)
+                self.stats["errors"] += 1
+                continue
+
+            existing = await self._fetchrow(
+                "SELECT id FROM faculties WHERE university_id = $1 AND name = $2",
+                univ_id, name,
+            )
+            if existing:
+                self._faculties[key] = existing["id"]
+            else:
+                if not self.dry_run:
+                    fac_id = await self.conn.fetchval(
+                        "INSERT INTO faculties (university_id, name) VALUES ($1, $2) RETURNING id",
+                        univ_id, name,
+                    )
+                    self._faculties[key] = fac_id
+                self.stats["faculties"] += 1
+
+        print(f"  faculties: {self.stats['faculties']} inserted/updated")
