@@ -84,3 +84,43 @@ class ProfileResponse(BaseModel):
     current_school: Optional[str]
     gpax: Optional[float]
     test_scores: list[TestScoreOut]
+
+
+# ── Endpoints ─────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/me",
+    response_model=ProfileResponse,
+    summary="Get current user's profile and test scores",
+)
+async def get_profile(user: dict = Depends(get_current_user)):
+    user_id: UUID = user["id"]
+
+    profile = await fetchrow(
+        """SELECT user_id, first_name, last_name, date_of_birth, avatar_url,
+                  address, sub_district, district, province, postal_code,
+                  current_school, gpax
+           FROM user_profiles WHERE user_id = $1""",
+        user_id,
+    )
+
+    scores = await fetch(
+        "SELECT subject, score, exam_year FROM user_test_scores WHERE user_id = $1 ORDER BY subject, exam_year DESC",
+        user_id,
+    )
+
+    if not profile:
+        return ProfileResponse(
+            user_id=user_id,
+            first_name=None, last_name=None, date_of_birth=None,
+            avatar_url=None, address=None, sub_district=None,
+            district=None, province=None, postal_code=None,
+            current_school=None, gpax=None,
+            test_scores=[TestScoreOut(**dict(s)) for s in scores],
+        )
+
+    return ProfileResponse(
+        **{k: v for k, v in dict(profile).items() if k != "gpax"},
+        gpax=float(profile["gpax"]) if profile["gpax"] is not None else None,
+        test_scores=[TestScoreOut(**dict(s)) for s in scores],
+    )
