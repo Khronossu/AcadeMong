@@ -184,6 +184,25 @@ CREATE TABLE IF NOT EXISTS user_test_scores (
     UNIQUE(user_id, subject, exam_year)
 );
 
+-- Table: historical_cutoffs (SCD Type 2 — year-over-year cutoff statistics)
+-- Producer emits current values; ingestion script manages effective_from/effective_to.
+-- Used to show safety margin trends ("last year's cutoff was X, you're at Y").
+CREATE TABLE IF NOT EXISTS historical_cutoffs (
+    id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    admission_project_id UUID REFERENCES admission_projects(id) ON DELETE CASCADE,
+    year                INTEGER NOT NULL,        -- TCAS admission cycle year
+    score_type          VARCHAR(50) NOT NULL,    -- Controlled vocab: DATA_CONTRACT §7.2
+    min_admitted_score  NUMERIC(8, 2),
+    max_admitted_score  NUMERIC(8, 2),
+    median_score        NUMERIC(8, 2),
+    applicants_count    INTEGER,
+    accepted_count      INTEGER,
+    source_url          TEXT NOT NULL,
+    effective_from      TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    effective_to        TIMESTAMP WITH TIME ZONE,  -- NULL = current record
+    UNIQUE(admission_project_id, year, score_type, effective_from)
+);
+
 -- ==========================================
 -- INDEXES FOR PERFORMANCE
 -- ==========================================
