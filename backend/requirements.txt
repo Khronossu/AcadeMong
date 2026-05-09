@@ -5,3 +5,5 @@ asyncpg==0.29.0
 redis[hiredis]==5.0.8
 python-dotenv==1.0.1
 firebase-admin==6.5.0
+pytest==8.3.4
+pytest-asyncio==0.24.0
