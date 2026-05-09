@@ -1,5 +1,114 @@
 import { useState } from "react";
 
+export default function EligibilityResults({ token }) {
+  const [results, setResults] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [filter, setFilter] = useState("all"); // "all" | "eligible" | "ineligible"
+
+  async function runCheck() {
+    setLoading(true);
+    setError(null);
+    setResults(null);
+    try {
+      const res = await fetch("/api/chat/eligibility", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.detail || "ไม่สามารถตรวจสอบสิทธิ์ได้");
+      }
+      setResults(await res.json());
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const shown = results?.results?.filter((r) => {
+    if (filter === "eligible") return r.eligible;
+    if (filter === "ineligible") return !r.eligible;
+    return true;
+  }) ?? [];
+
+  return (
+    <div style={containerStyles.container}>
+      <h2 style={containerStyles.heading}>ตรวจสอบคุณสมบัติ TCAS รอบ 3</h2>
+      <p style={containerStyles.hint}>
+        กดปุ่มด้านล่างเพื่อดูโครงการรับสมัครทั้งหมดที่คุณมีสิทธิ์สมัคร<br />
+        (บันทึก GPAX และคะแนนสอบในแท็บ "โปรไฟล์" ก่อน)
+      </p>
+
+      <button
+        onClick={runCheck}
+        disabled={loading || !token}
+        style={containerStyles.checkBtn}
+      >
+        {loading ? "กำลังตรวจสอบ..." : "ตรวจสอบคุณสมบัติ"}
+      </button>
+
+      {error && <p style={containerStyles.error}>{error}</p>}
+
+      {results && (
+        <>
+          <div style={containerStyles.summary}>
+            <span style={containerStyles.badge}>ปีการศึกษา {results.year}</span>
+            <span style={{ ...containerStyles.badge, background: "#0a7" }}>
+              ผ่านเกณฑ์ {results.eligible_count} / {results.total_projects} โครงการ
+            </span>
+          </div>
+
+          <div style={containerStyles.filterRow}>
+            {["all", "eligible", "ineligible"].map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f)}
+                style={{ ...containerStyles.filterBtn, ...(filter === f ? containerStyles.filterActive : {}) }}
+              >
+                {f === "all" ? "ทั้งหมด" : f === "eligible" ? "ผ่านเกณฑ์" : "ไม่ผ่านเกณฑ์"}
+              </button>
+            ))}
+          </div>
+
+          <div>
+            {shown.map((r) => (
+              <ProjectCard key={r.admission_project_id} result={r} />
+            ))}
+            {shown.length === 0 && (
+              <p style={containerStyles.empty}>ไม่มีโครงการในหมวดนี้</p>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+const containerStyles = {
+  container: { maxWidth: 800, margin: "0 auto", padding: "1rem" },
+  heading: { color: "#1a1a2e" },
+  hint: { color: "#555", marginBottom: "1rem", lineHeight: 1.6 },
+  checkBtn: {
+    background: "#0f3460", color: "#fff", border: "none", borderRadius: 8,
+    padding: "0.6rem 1.5rem", cursor: "pointer", fontSize: "1rem", marginBottom: "1rem",
+  },
+  error: { color: "#c00" },
+  summary: { display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" },
+  badge: {
+    background: "#0f3460", color: "#fff", borderRadius: 20,
+    padding: "0.25rem 0.75rem", fontSize: "0.85rem",
+  },
+  filterRow: { display: "flex", gap: "0.5rem", marginBottom: "1rem" },
+  filterBtn: {
+    border: "1px solid #ccc", borderRadius: 20, padding: "0.25rem 0.75rem",
+    cursor: "pointer", background: "#fff", fontSize: "0.85rem",
+  },
+  filterActive: { background: "#0f3460", color: "#fff", border: "1px solid #0f3460" },
+  empty: { color: "#888", textAlign: "center", padding: "2rem" },
+};
+
 export function ProjectCard({ result }) {
   const [open, setOpen] = useState(false);
   const borderColor = result.eligible ? "#0a7" : "#c33";
