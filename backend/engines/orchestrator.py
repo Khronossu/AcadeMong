@@ -16,6 +16,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from db.postgres import fetchrow
+from engines.career_matcher import get_career_suggestions
 from engines.eligibility_engine import check_eligibility
 from engines.prompt_composer import compose_dreamer_prompt, compose_tcas_prompt
 from engines.rag_engine import retrieve_context
@@ -45,7 +46,10 @@ async def handle_dreamer_message(
 ) -> str:
     """Generate a Flow A (Career Dreamer) response via Typhoon2."""
     profile = await _load_user_profile(user_id)
-    system_prompt = compose_dreamer_prompt(profile)
+    career_suggestions = (
+        await get_career_suggestions(str(user_id), history) if len(history) >= 2 else []
+    )
+    system_prompt = compose_dreamer_prompt(profile, career_suggestions)
     cfg = get_model_config("dreamer_chat")
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": content}]
     return await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
