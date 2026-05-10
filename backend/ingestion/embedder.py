@@ -1,52 +1,22 @@
-"""Embedder — adds dense and sparse vectors to each chunk.
+"""Embedder — adds dense vectors to each chunk via nomic-embed-text.
 
-Dense vector:  nomic-embed-text via ollama_client.embed() (768 dims).
-Sparse vector: BM25 via fastembed SparseTextEmbedding model "Qdrant/bm25".
-               fastembed is bundled with qdrant-client[fastembed].
+Dense vector: nomic-embed-text via ollama_client.embed() (768 dims).
 
-Both vectors are required for Qdrant hybrid search (prefetch + RRF fusion).
+Note: BM25 sparse vectors were planned but fastembed's onnxruntime dependency
+has no Python 3.14 wheels yet. Dense + cross-encoder reranking is used instead.
 """
 
 from __future__ import annotations
 
-import asyncio
-
-from fastembed import SparseTextEmbedding
 from models.ollama_client import embed
 
 _EMBEDDING_MODEL = "nomic-embed-text"
-_BM25_MODEL = "Qdrant/bm25"
-
-_sparse_model: SparseTextEmbedding | None = None
-
-
-def _get_sparse_model() -> SparseTextEmbedding:
-    global _sparse_model
-    if _sparse_model is None:
-        _sparse_model = SparseTextEmbedding(model_name=_BM25_MODEL)
-    return _sparse_model
 
 
 async def embed_chunks(chunks: list[dict]) -> list[dict]:
-    """Add dense_vector and sparse_vector to each chunk dict (in-place copy).
-
-    Processes dense embeddings sequentially to avoid overloading Ollama.
-    Sparse BM25 vectors are computed locally via fastembed (no network call).
-    """
-    texts = [c["text"] for c in chunks]
-
-    sparse_model = _get_sparse_model()
-    sparse_results = list(sparse_model.embed(texts))
-
+    """Add dense_vector to each chunk dict. Processes sequentially to avoid overloading Ollama."""
     embedded: list[dict] = []
-    for i, chunk in enumerate(chunks):
+    for chunk in chunks:
         dense_vec = await embed(_EMBEDDING_MODEL, chunk["text"])
-        sparse = sparse_results[i]
-        embedded.append({
-            **chunk,
-            "dense_vector": dense_vec,
-            "sparse_indices": sparse.indices.tolist(),
-            "sparse_values": sparse.values.tolist(),
-        })
-
+        embedded.append({**chunk, "dense_vector": dense_vec})
     return embedded

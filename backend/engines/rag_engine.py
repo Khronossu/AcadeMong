@@ -1,41 +1,33 @@
-"""RAG engine — hybrid BM25+dense retrieval with cross-encoder reranking.
+"""RAG engine — dense retrieval with cross-encoder reranking.
 
 Retrieval pipeline (per CLAUDE.md §6.3):
   1. Metadata filter (year, university) applied at Qdrant query time.
-  2. Prefetch dense results (nomic-embed-text) + sparse BM25 results.
-  3. Single Qdrant query_points call fuses both via Reciprocal Rank Fusion.
-  4. Top-20 candidates sent to cross-encoder (BAAI/bge-reranker-base).
-  5. Returns top RERANKER_TOP_K chunk texts, each prefixed with source info.
+  2. Dense search via nomic-embed-text (top PREFETCH_K candidates).
+  3. Cross-encoder (BAAI/bge-reranker-base) reranks candidates.
+  4. Returns top RERANKER_TOP_K chunk texts prefixed with source info.
 
-Graceful degradation: if Qdrant is unreachable, returns [] so tcas_rag
-still functions from SQL eligibility data alone (no exception propagation).
+Note: BM25 sparse vectors planned but deferred — fastembed's onnxruntime
+has no Python 3.14 wheels. Dense + reranker is the active retrieval strategy.
+
+Graceful degradation: returns [] if Qdrant is unreachable so tcas_rag still
+functions from SQL eligibility data alone.
 """
 
 from __future__ import annotations
 
 import os
 
-from fastembed import SparseTextEmbedding
-from qdrant_client.models import Filter, FieldCondition, MatchValue, Prefetch, FusionQuery, Fusion
+from qdrant_client.models import FieldCondition, Filter, MatchValue
 from sentence_transformers import CrossEncoder
 
 from db.qdrant_client import TCAS_COLLECTION, get_qdrant_client
 from models.ollama_client import embed
 
 _EMBEDDING_MODEL = "nomic-embed-text"
-_BM25_MODEL = "Qdrant/bm25"
 _RERANKER_MODEL = "BAAI/bge-reranker-base"
 _PREFETCH_K = 20
 
-_sparse_model: SparseTextEmbedding | None = None
 _reranker: CrossEncoder | None = None
-
-
-def _get_sparse_model() -> SparseTextEmbedding:
-    global _sparse_model
-    if _sparse_model is None:
-        _sparse_model = SparseTextEmbedding(model_name=_BM25_MODEL)
-    return _sparse_model
 
 
 def _get_reranker() -> CrossEncoder:
@@ -75,24 +67,16 @@ async def retrieve_context(
 
     try:
         client = get_qdrant_client()
-
         dense_vec = await embed(_EMBEDDING_MODEL, query)
-
-        sparse_model = _get_sparse_model()
-        sparse_result = next(sparse_model.embed([query]))
-        sparse_vec = {"indices": sparse_result.indices.tolist(), "values": sparse_result.values.tolist()}
-
         query_filter = _build_filter(filters)
 
-        results = client.query_points(
+        results = client.search(
             collection_name=TCAS_COLLECTION,
-            prefetch=[
-                Prefetch(query=dense_vec, using="dense", limit=_PREFETCH_K, filter=query_filter),
-                Prefetch(query=sparse_vec, using="sparse", limit=_PREFETCH_K, filter=query_filter),
-            ],
-            query=FusionQuery(fusion=Fusion.RRF),
+            query_vector=dense_vec,
+            query_filter=query_filter,
             limit=_PREFETCH_K,
-        ).points
+            with_payload=True,
+        )
 
         if not results:
             return []
@@ -107,7 +91,6 @@ async def retrieve_context(
 
         chunks = []
         for _, (text, payload) in ranked[:top_k]:
-            source = payload.get("source_url") or payload.get("source_path", "")
             university = payload.get("university") or ""
             page = payload.get("page", "?")
             prefix = f"[ที่มา: {university} หน้า {page}]" if university else f"[หน้า {page}]"

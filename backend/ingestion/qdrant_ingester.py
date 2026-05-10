@@ -1,8 +1,7 @@
 """Qdrant ingester — collection management and chunk upsert.
 
 Collection schema:
-  - Named dense vector  "dense"  — 768 dims (nomic-embed-text), cosine distance
-  - Named sparse vector "sparse" — BM25 (fastembed Qdrant/bm25)
+  - Dense vector "dense" — 768 dims (nomic-embed-text), cosine distance
 
 Point ID is deterministic: SHA-256(doc_hash + chunk_index) truncated to 16 hex chars
 then cast to int, so re-running the ingester is idempotent (same chunk = same ID).
@@ -13,14 +12,7 @@ from __future__ import annotations
 import hashlib
 
 from qdrant_client import QdrantClient
-from qdrant_client.models import (
-    Distance,
-    PointStruct,
-    SparseIndexParams,
-    SparseVectorParams,
-    VectorParams,
-    VectorsConfig,
-)
+from qdrant_client.models import Distance, PointStruct, VectorParams
 
 from db.qdrant_client import TCAS_COLLECTION
 
@@ -41,12 +33,7 @@ def init_collection(client: QdrantClient) -> None:
 
     client.create_collection(
         collection_name=TCAS_COLLECTION,
-        vectors_config={
-            "dense": VectorParams(size=_DENSE_DIM, distance=Distance.COSINE),
-        },
-        sparse_vectors_config={
-            "sparse": SparseVectorParams(index=SparseIndexParams(on_disk=False)),
-        },
+        vectors_config=VectorParams(size=_DENSE_DIM, distance=Distance.COSINE),
     )
 
 
@@ -58,13 +45,7 @@ def upsert_chunks(client: QdrantClient, embedded_chunks: list[dict]) -> int:
     points = [
         PointStruct(
             id=_chunk_id(c["doc_hash"], c["chunk_index"]),
-            vector={
-                "dense": c["dense_vector"],
-                "sparse": {
-                    "indices": c["sparse_indices"],
-                    "values": c["sparse_values"],
-                },
-            },
+            vector=c["dense_vector"],
             payload={
                 "text": c["text"],
                 "page": c["page"],
