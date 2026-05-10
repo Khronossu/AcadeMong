@@ -31,6 +31,7 @@ from ingestion.chunker import chunk_pages
 from ingestion.embedder import embed_chunks
 from ingestion.pdf_parser import parse_pdf
 from ingestion.qdrant_ingester import init_collection, upsert_chunks
+from memory.semantic_cache import flush_rag_cache
 
 
 def _load_manifest(pdf_dir: Path) -> dict[str, dict]:
@@ -75,6 +76,9 @@ async def ingest_directory(pdf_dir: str) -> None:
         print(f"           {n} point(s) upserted into Qdrant\n")
 
     print(f"Done. Total points upserted: {total_upserted}")
+
+    flushed = await flush_rag_cache()
+    print(f"Semantic cache flushed: {flushed} key(s) deleted")
 
 
 def main() -> None:
