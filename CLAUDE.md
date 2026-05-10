@@ -604,13 +604,13 @@ Phase 13   → Feedback loop + eval automation [NEW]
 - [ ] All 6 intent types tested end-to-end
 
 ### Phase 9.5 — Guardrails
-- [ ] Input gate: topic classifier + PII redactor + injection detector in `backend/guardrails/input_gate.py`
-- [ ] Prompt hardening: master prompt frozen with refusal rules + `<context>` structural separation
-- [ ] Numeric claim validator in `backend/guardrails/numeric_validator.py` — verifies every numeric output claim against SQL result or retrieved context
+- [x] Input gate: topic classifier + PII redactor + injection detector in `backend/guardrails/input_gate.py`
+- [x] Prompt hardening: master prompt frozen with refusal rules + `<context>` structural separation
+- [x] Numeric claim validator in `backend/guardrails/numeric_validator.py` — verifies every numeric output claim against SQL result or retrieved context
 - [ ] Citation enforcement for RAG responses
 - [ ] Llama Guard 3 integration as output safety filter
 - [ ] JSON-mode structured outputs + Pydantic validation for career + eligibility endpoints
-- [ ] Unit tests per layer with adversarial corpus (at least 50 jailbreak attempts)
+- [x] Unit tests per layer with adversarial corpus (at least 50 jailbreak attempts)
 
 ### Phase 10 — Frontend
 - [ ] React single page app
