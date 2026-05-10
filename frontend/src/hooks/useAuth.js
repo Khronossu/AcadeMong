@@ -48,7 +48,8 @@ export function useAuth() {
       } else {
         setAuthState("signed-out");
       }
-    } catch {
+    } catch (e) {
+      console.error("_tryLogin failed:", e);
       setAuthState("signed-out");
     }
   }

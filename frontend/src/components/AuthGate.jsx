@@ -63,13 +63,18 @@ const s = {
 };
 
 function SignInScreen({ onSignIn }) {
+  const handleSignIn = () => {
+    console.log("Sign-in button clicked");
+    Promise.resolve(onSignIn()).catch((e) => console.error("signIn error:", e));
+  };
+
   return (
     <div style={s.screen}>
       <div style={s.card}>
         <div style={s.logo}>🎓</div>
         <h1 style={s.title}>AcadeMong</h1>
         <p style={s.sub}>ผู้ช่วย AI สำหรับการเลือกคณะและวางแผนอาชีพ</p>
-        <button style={s.googleBtn} onClick={onSignIn}>
+        <button style={s.googleBtn} onClick={handleSignIn}>
           <svg width="20" height="20" viewBox="0 0 24 24">
             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
             <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
