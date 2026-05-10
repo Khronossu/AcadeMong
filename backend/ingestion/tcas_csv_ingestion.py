@@ -31,6 +31,13 @@ ROUND_TYPE_MAP = {
     "direct":    4,
 }
 
+ROUND_TYPE_THAI = {
+    "portfolio": "Portfolio",
+    "quota":     "โควตา",
+    "admission": "รับตรงร่วมกัน",
+    "direct":    "รับตรง",
+}
+
 # Maps raw subject codes from the data release → system vocabulary (ProfileForm subjects).
 # Codes not in this map are silently skipped during subject_requirements ingestion.
 SUBJECT_MAP: dict[str, str] = {
@@ -235,7 +242,7 @@ class TcasIngestion:
         for row in rows:
             program_id   = _str(row, "program_id")
             project_id   = _str(row, "project_id")
-            project_name = _str(row, "project_name_th") or f"({_str(row, 'round_type')} {_str(row, 'year')})"
+            project_name = _str(row, "project_name_th") or ROUND_TYPE_THAI.get(round_type, round_type)
             round_type   = _str(row, "round_type")
             year         = _int(row, "year")
             seats        = _int(row, "receive_student_number")
