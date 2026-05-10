@@ -157,6 +157,4 @@ if __name__ == "__main__":
         )
         print(f"Saved {len(careers)} career entries → {_OUTPUT_PATH}", flush=True)
 
-    if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main())

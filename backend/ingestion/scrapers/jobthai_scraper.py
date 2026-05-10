@@ -1,33 +1,27 @@
-"""JobThai scraper — extracts career data via httpx + BeautifulSoup.
+"""JobThai scraper — extracts career data via Playwright (headless Chromium).
 
-Scrapes job listings by category, aggregates by normalized career title,
-and saves the result to data/career/jobthai_raw.json.
+JobThai is a JS SPA; static HTML contains no job listings. The scraper
+intercepts XHR/fetch network requests to capture the underlying API response
+directly, which is far more reliable than parsing rendered HTML.
+
+Saves results to data/career/jobthai_raw.json.
 
 CLI: python -m ingestion.scrapers.jobthai_scraper
+     (requires: playwright install chromium)
 """
 
 from __future__ import annotations
 
 import asyncio
 import json
-import os
-import re
 import sys
 from collections import defaultdict
 from pathlib import Path
 
-import httpx
-from bs4 import BeautifulSoup
+from playwright.async_api import Route, async_playwright
 
 _BASE_URL = "https://www.jobthai.com/th/jobs"
-_HEADERS = {
-    "User-Agent": (
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) "
-        "Chrome/124.0.0.0 Safari/537.36"
-    ),
-    "Accept-Language": "th-TH,th;q=0.9,en;q=0.8",
-}
+_OUTPUT_PATH = Path(__file__).resolve().parents[3] / "data" / "career" / "jobthai_raw.json"
 
 # JobThai category codes → industry group label
 _CATEGORIES: dict[str, str] = {
@@ -41,74 +35,113 @@ _CATEGORIES: dict[str, str] = {
     "8":  "งานออกแบบและสร้างสรรค์",
 }
 
-_OUTPUT_PATH = Path(__file__).resolve().parents[3] / "data" / "career" / "jobthai_raw.json"
-
-
-def _parse_salary(salary_text: str) -> tuple[int | None, int | None]:
-    """Extract (min, max) THB from a salary string like '30,000 - 50,000 บาท'."""
-    nums = re.findall(r"[\d,]+", salary_text)
-    ints = [int(n.replace(",", "")) for n in nums if n.replace(",", "").isdigit()]
-    if len(ints) >= 2:
-        return ints[0], ints[1]
-    if len(ints) == 1:
-        return ints[0], ints[0]
-    return None, None
-
 
 def _normalize_title(title: str) -> str:
     return title.strip().lower()
 
 
-async def _scrape_page(client: httpx.AsyncClient, category: str, page: int) -> list[dict]:
-    params = {"jobtype": category, "page": page}
-    try:
-        resp = await client.get(_BASE_URL, params=params, headers=_HEADERS, timeout=20)
-        resp.raise_for_status()
-    except Exception:
-        return []
+async def _scrape_category_via_api(
+    page,
+    category_id: str,
+    industry_group: str,
+    max_pages: int,
+) -> list[dict]:
+    """Navigate to a category page, capture XHR responses, extract job data."""
+    captured: list[dict] = []
 
-    soup = BeautifulSoup(resp.text, "lxml")
-    jobs: list[dict] = []
+    async def handle_response(response):
+        url = response.url
+        if "api.jobthai.com" in url and response.status == 200:
+            try:
+                body = await response.json()
+                # JobThai API returns jobs in various shapes; try common keys
+                jobs_data = (
+                    body.get("jobs")
+                    or body.get("data")
+                    or body.get("result")
+                    or (body if isinstance(body, list) else [])
+                )
+                if isinstance(jobs_data, list):
+                    for job in jobs_data:
+                        title = (
+                            job.get("position_name")
+                            or job.get("job_title")
+                            or job.get("title")
+                            or job.get("name")
+                            or ""
+                        )
+                        if not title:
+                            continue
+                        salary_min = job.get("salary_min") or job.get("min_salary")
+                        salary_max = job.get("salary_max") or job.get("max_salary")
+                        avg = None
+                        if salary_min and salary_max:
+                            avg = (int(salary_min) + int(salary_max)) // 2
+                        elif salary_min:
+                            avg = int(salary_min)
+                        elif salary_max:
+                            avg = int(salary_max)
+                        captured.append({
+                            "title": title.strip(),
+                            "avg_salary": avg,
+                            "industry_group": industry_group,
+                        })
+            except Exception:
+                pass
 
-    for card in soup.select("div.job-list-item, div[class*='job-card'], article[class*='job']"):
-        title_el = card.select_one("h2, h3, a[class*='title'], span[class*='title']")
-        if not title_el:
-            continue
-        title = title_el.get_text(strip=True)
-        if not title:
-            continue
+    page.on("response", handle_response)
 
-        salary_el = card.select_one("[class*='salary'], [class*='wage']")
-        salary_text = salary_el.get_text(strip=True) if salary_el else ""
-        sal_min, sal_max = _parse_salary(salary_text)
+    for pg in range(1, max_pages + 1):
+        url = f"{_BASE_URL}?jobtype={category_id}&page={pg}"
+        try:
+            await page.goto(url, wait_until="networkidle", timeout=25_000)
+            await asyncio.sleep(1)
+        except Exception:
+            break
 
-        jobs.append({
-            "title": title,
-            "salary_min": sal_min,
-            "salary_max": sal_max,
-            "salary_text": salary_text,
-        })
+        if not captured and pg == 1:
+            # Fallback: try parsing visible text job titles from page
+            try:
+                els = await page.query_selector_all(
+                    "h2, h3, [class*='position'], [class*='title'], [class*='job-name']"
+                )
+                for el in els:
+                    text = (await el.inner_text()).strip()
+                    if text and 3 < len(text) < 100:
+                        captured.append({
+                            "title": text,
+                            "avg_salary": None,
+                            "industry_group": industry_group,
+                        })
+            except Exception:
+                pass
 
-    return jobs
+    page.remove_listener("response", handle_response)
+    return captured
 
 
-async def scrape_jobthai(max_pages: int = 5) -> list[dict]:
-    """Scrape JobThai by category, aggregate by career title.
-
-    Returns list of dicts: {title, industry_group, avg_salary_thb, active_job_openings}
-    """
+async def scrape_jobthai(max_pages: int = 3) -> list[dict]:
+    """Scrape JobThai by category, aggregate by career title."""
     raw: list[dict] = []
 
-    async with httpx.AsyncClient(follow_redirects=True) as client:
-        for cat_id, industry_group in _CATEGORIES.items():
-            for page in range(1, max_pages + 1):
-                jobs = await _scrape_page(client, cat_id, page)
-                if not jobs:
-                    break
-                for job in jobs:
-                    job["industry_group"] = industry_group
-                raw.extend(jobs)
-                await asyncio.sleep(0.5)
+    async with async_playwright() as pw:
+        browser = await pw.chromium.launch(headless=True)
+        context = await browser.new_context(
+            locale="th-TH",
+            user_agent=(
+                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) "
+                "Chrome/124.0.0.0 Safari/537.36"
+            ),
+        )
+        page = await context.new_page()
+
+        for cat_id, group in _CATEGORIES.items():
+            jobs = await _scrape_category_via_api(page, cat_id, group, max_pages)
+            raw.extend(jobs)
+            print(f"  Category {cat_id} ({group}): {len(jobs)} raw entries", flush=True)
+
+        await browser.close()
 
     # Aggregate by normalized title
     title_data: dict[str, dict] = defaultdict(lambda: {
@@ -121,9 +154,8 @@ async def scrape_jobthai(max_pages: int = 5) -> list[dict]:
         entry = title_data[key]
         entry["industry_group"] = entry["industry_group"] or job.get("industry_group", "")
         entry["openings"] += 1
-        if job["salary_min"] and job["salary_max"]:
-            mid = (job["salary_min"] + job["salary_max"]) // 2
-            entry["salary_samples"].append(mid)
+        if job.get("avg_salary"):
+            entry["salary_samples"].append(job["avg_salary"])
 
     results: list[dict] = []
     for norm_title, data in title_data.items():
@@ -142,8 +174,8 @@ async def scrape_jobthai(max_pages: int = 5) -> list[dict]:
 
 if __name__ == "__main__":
     async def main() -> None:
-        print("Scraping JobThai...", flush=True)
-        careers = await scrape_jobthai(max_pages=3)
+        print("Scraping JobThai (Playwright + XHR intercept)...", flush=True)
+        careers = await scrape_jobthai(max_pages=2)
         _OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
         _OUTPUT_PATH.write_text(
             json.dumps(careers, ensure_ascii=False, indent=2),
@@ -151,6 +183,4 @@ if __name__ == "__main__":
         )
         print(f"Saved {len(careers)} career entries → {_OUTPUT_PATH}", flush=True)
 
-    if sys.platform == "win32":
-        asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main())
