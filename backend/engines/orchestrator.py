@@ -20,6 +20,7 @@ from engines.career_matcher import get_career_suggestions
 from engines.eligibility_engine import check_eligibility
 from engines.prompt_composer import compose_dreamer_prompt, compose_tcas_prompt
 from engines.rag_engine import retrieve_context
+from guardrails.numeric_validator import validate_numeric_claims
 from memory.long_term_memory import save_message
 from memory.session_memory import (
     append_to_chat_window,
@@ -98,7 +99,14 @@ async def handle_tcas_message(
     )
     cfg = get_model_config("tcas_chat")
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": content}]
-    return await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
+    response = await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
+
+    _valid, response, flags = validate_numeric_claims(response, eligibility, rag_context)
+    if flags:
+        import logging
+        logging.getLogger(__name__).warning("Numeric claims stripped: %s", flags)
+
+    return response
 
 
 async def handle_message(
