@@ -109,9 +109,9 @@ async def login_user(req: LoginRequest):
     if not firebase_uid:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Firebase token is missing 'uid' claim.")
 
-    # Find user in our database
+    # Find user in our database (include role for RBAC caching)
     user_record = await fetchrow(
-        "SELECT id, username FROM users WHERE firebase_uid = $1",
+        "SELECT id, username, role FROM users WHERE firebase_uid = $1",
         firebase_uid
     )
 

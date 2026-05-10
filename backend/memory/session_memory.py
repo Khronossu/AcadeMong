@@ -91,3 +91,33 @@ async def append_to_chat_window(user_id: str, session_id: str, role: str, conten
     if len(messages) > _WINDOW_SIZE:
         messages = messages[-_WINDOW_SIZE:]
     await set_chat_window(user_id, session_id, messages, ttl=ttl)
+
+
+_SIGNALS_TTL = 7200
+_SIGNAL_DEFAULTS = {
+    "comparison_count": 0,
+    "prep_count": 0,
+    "short_count": 0,
+    "total_count": 0,
+}
+
+
+async def get_signals(user_id: str, session_id: str) -> dict:
+    """Return the behavioral signal counters for this session (all zeros if absent)."""
+    if not redis_pool:
+        raise ConnectionError("Redis pool is not initialized.")
+    raw = await redis_pool.get(f"session:{user_id}:{session_id}:signals")
+    if not raw:
+        return dict(_SIGNAL_DEFAULTS)
+    return {**_SIGNAL_DEFAULTS, **json.loads(raw)}
+
+
+async def increment_signal(user_id: str, session_id: str, signal_name: str) -> None:
+    """Atomically increment one behavioral signal counter; create key on first call."""
+    if not redis_pool:
+        raise ConnectionError("Redis pool is not initialized.")
+    key = f"session:{user_id}:{session_id}:signals"
+    raw = await redis_pool.get(key)
+    signals = {**_SIGNAL_DEFAULTS, **json.loads(raw)} if raw else dict(_SIGNAL_DEFAULTS)
+    signals[signal_name] = signals.get(signal_name, 0) + 1
+    await redis_pool.set(key, json.dumps(signals), ex=_SIGNALS_TTL)

@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS users (
   email         VARCHAR UNIQUE NOT NULL,
   firebase_uid  VARCHAR UNIQUE NOT NULL, 
   username      VARCHAR UNIQUE,          -- User-defined handle
+  role          VARCHAR DEFAULT 'student' NOT NULL, -- 'student' | 'admin' (promote via SQL)
   created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   last_login_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
@@ -346,6 +347,15 @@ The fallback is currently unset pending a structured comparison of Gemma 3/4 (8B
   6. On session end: serialize user memory → write back to PostgreSQL
 - **Credentials:** Pass full service account JSON as `FIREBASE_CREDENTIALS_JSON` (single-line minified string) — see §16.
 - **Rationale:** Production-grade security, easy user management, no password hashing burden, instant access to Google profiles without manual OAuth boilerplate.
+- **Roles (RBAC):**
+  - Two roles: `student` (default for all registrations) and `admin` (system operators).
+  - Stored as `role VARCHAR DEFAULT 'student'` on the `users` table in PostgreSQL.
+  - Promotion to `admin` is manual: `UPDATE users SET role = 'admin' WHERE email = '...';`
+  - Firebase custom claims are NOT used — role lives in PostgreSQL only.
+  - Role is cached in the Redis profile key alongside `gpax` / `current_school`.
+  - `backend/guardrails/input_gate.py` — `check_role(user, required_role)` enforces role in router handlers.
+  - Role is injected into every system prompt so the LLM knows whether it is talking to a student or an admin.
+  - Migration for existing databases: `ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR DEFAULT 'student' NOT NULL;`
 
 ---
 
@@ -994,10 +1004,12 @@ LLM-facing systems fail in predictable ways. For AcadeMong, the realistic abuse 
 - Request size cap: 8KB body, 2000 char prompt
 
 ### Layer 2 — Input Validation
-- **Topic classifier**: zero-shot check — is this query education/TCAS/career relevant? Reject off-topic with friendly redirect.
-- **PII redaction** on incoming text before logging (Thai national ID, phone, email patterns)
-- **Prompt-injection detector**: regex + classifier for `ignore previous`, `you are now`, `system:`, `</system>`, `[INST]`, and Thai equivalents
-- **Unicode normalization**: strip zero-width chars, homoglyph attacks
+Implemented in `backend/guardrails/input_gate.py`:
+- **`validate_topic(message)`**: keyword allowlist — returns `True` if on-topic; advisory only (logs warning, does not block) to avoid false positives on Thai queries.
+- **`detect_injection(message)`**: regex scan for `ignore previous`, `you are now`, `system:`, `</system>`, `[INST]`, Thai equivalents (`ลืมคำสั่ง`, `คุณคือ`, `ทำแทน`); case-insensitive, Unicode-normalized. Returns HTTP 400 if triggered.
+- **`check_role(user, required_role)`**: enforces role hierarchy (`admin` > `student`); raises HTTP 403 if user's role is insufficient. Used by admin-only endpoints.
+- **PII redaction** on incoming text before logging (Thai national ID, phone, email patterns) — planned for Phase 10.5.
+- **Unicode normalization**: strip zero-width chars, homoglyph attacks — planned for Phase 10.5.
 
 ### Layer 3 — Retrieval Hardening
 - **Source allowlist + manifest**: PDFs ingested only from verified university domains, SHA-256 hashed, signed manifest committed to repo
