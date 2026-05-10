@@ -21,9 +21,32 @@ from engines.eligibility_engine import check_eligibility
 from engines.prompt_composer import compose_dreamer_prompt, compose_tcas_prompt
 from engines.rag_engine import retrieve_context
 from memory.long_term_memory import save_message
-from memory.session_memory import append_to_chat_window, get_chat_window, get_user_session
+from memory.session_memory import (
+    append_to_chat_window,
+    get_chat_window,
+    get_signals,
+    get_user_session,
+    increment_signal,
+)
 from models.model_router import get_model_config
 from models.ollama_client import chat
+
+
+_COMPARISON_KW = ("เปรียบ", "compare", " vs ", "ต่าง", "ดีกว่า", "เทียบ", "versus")
+_PREPARATION_KW = ("เตรียม", "prepare", "portfolio", "สัมภาษณ์", "ทำอย่างไร", "ขั้นตอน")
+
+
+async def _update_signals(user_id: str, session_id: str, content: str) -> dict:
+    """Increment per-session behavioral counters and return updated signals dict."""
+    lower = content.lower()
+    await increment_signal(user_id, session_id, "total_count")
+    if any(kw in lower for kw in _COMPARISON_KW):
+        await increment_signal(user_id, session_id, "comparison_count")
+    if any(kw in lower for kw in _PREPARATION_KW):
+        await increment_signal(user_id, session_id, "prep_count")
+    if len(content.strip()) < 40:
+        await increment_signal(user_id, session_id, "short_count")
+    return await get_signals(user_id, session_id)
 
 
 async def _load_user_profile(user_id: UUID) -> dict:
@@ -46,10 +69,12 @@ async def handle_dreamer_message(
 ) -> str:
     """Generate a Flow A (Career Dreamer) response via Typhoon2."""
     profile = await _load_user_profile(user_id)
+    signals = await _update_signals(str(user_id), str(session_id), content)
     career_suggestions = (
         await get_career_suggestions(str(user_id), history) if len(history) >= 2 else []
     )
-    system_prompt = compose_dreamer_prompt(profile, career_suggestions)
+    user_role = profile.get("role", "student")
+    system_prompt = compose_dreamer_prompt(profile, career_suggestions, signals=signals, user_role=user_role)
     cfg = get_model_config("dreamer_chat")
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": content}]
     return await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
@@ -63,9 +88,14 @@ async def handle_tcas_message(
 ) -> str:
     """Generate a Flow B (TCAS advisor) response grounded in SQL eligibility data + RAG."""
     profile = await _load_user_profile(user_id)
+    signals = await _update_signals(str(user_id), str(session_id), content)
     eligibility = await check_eligibility(user_id=user_id)
     rag_context = await retrieve_context(content)
-    system_prompt = compose_tcas_prompt(profile, eligibility, rag_context)
+    user_role = profile.get("role", "student")
+    system_prompt = compose_tcas_prompt(
+        profile, eligibility, rag_context,
+        message=content, signals=signals, user_role=user_role,
+    )
     cfg = get_model_config("tcas_chat")
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": content}]
     return await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
