@@ -23,6 +23,7 @@ from qdrant_client.http.models import FieldCondition, Filter, MatchValue, NamedS
 from sentence_transformers import CrossEncoder
 
 from db.qdrant_client import TCAS_COLLECTION, get_async_qdrant_client
+from memory.semantic_cache import get_cached_rag, set_cached_rag
 from models.ollama_client import embed
 
 _EMBEDDING_MODEL = "nomic-embed-text"
@@ -108,6 +109,10 @@ async def retrieve_context(
             asyncio.to_thread(lambda: next(_get_sparse_model().embed([query]))),
         )
 
+        cached = await get_cached_rag(dense_vec)
+        if cached is not None:
+            return cached[:top_k]
+
         sparse_vec = SparseVector(
             indices=sparse_result.indices.tolist(),
             values=sparse_result.values.tolist(),
@@ -149,6 +154,7 @@ async def retrieve_context(
             prefix = f"[ที่มา: {university} หน้า {page}]" if university else f"[หน้า {page}]"
             chunks.append(f"{prefix}\n{text}")
 
+        await set_cached_rag(dense_vec, chunks)
         return chunks
 
     except Exception:
