@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-export default function EligibilityResults({ token }) {
+export default function EligibilityResults({ getToken }) {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -11,6 +11,7 @@ export default function EligibilityResults({ token }) {
     setError(null);
     setResults(null);
     try {
+      const token = await getToken();
       const res = await fetch("/api/chat/eligibility", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
@@ -43,7 +44,7 @@ export default function EligibilityResults({ token }) {
 
       <button
         onClick={runCheck}
-        disabled={loading || !token}
+        disabled={loading}
         style={containerStyles.checkBtn}
       >
         {loading ? "กำลังตรวจสอบ..." : "ตรวจสอบคุณสมบัติ"}

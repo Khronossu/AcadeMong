@@ -10,7 +10,7 @@ const SUBJECTS = [
 
 const CURRENT_YEAR = new Date().getFullYear();
 
-export default function ProfileForm({ token, onSaved }) {
+export default function ProfileForm({ getToken, onSaved }) {
   const [gpax, setGpax] = useState("");
   const [school, setSchool] = useState("");
   const [scores, setScores] = useState([{ subject: "TGAT1", score: "", exam_year: CURRENT_YEAR }]);
@@ -19,10 +19,8 @@ export default function ProfileForm({ token, onSaved }) {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (!token) return;
-    fetch("/api/profile/me", {
-      headers: { Authorization: `Bearer ${token}` },
-    })
+    getToken()
+      .then((token) => fetch("/api/profile/me", { headers: { Authorization: `Bearer ${token}` } }))
       .then((r) => r.json())
       .then((data) => {
         if (data.gpax != null) setGpax(String(data.gpax));
@@ -36,7 +34,7 @@ export default function ProfileForm({ token, onSaved }) {
         }
       })
       .catch(() => {});
-  }, [token]);
+  }, []);
 
   function addScore() {
     setScores((prev) => [...prev, { subject: "TGAT1", score: "", exam_year: CURRENT_YEAR }]);
@@ -71,6 +69,7 @@ export default function ProfileForm({ token, onSaved }) {
     };
 
     try {
+      const token = await getToken();
       const res = await fetch("/api/profile/me", {
         method: "PUT",
         headers: {
@@ -155,7 +154,7 @@ export default function ProfileForm({ token, onSaved }) {
       {error && <p style={styles.error}>{error}</p>}
       {success && <p style={styles.success}>บันทึกสำเร็จ</p>}
 
-      <button type="submit" disabled={saving || !token} style={styles.saveBtn}>
+      <button type="submit" disabled={saving} style={styles.saveBtn}>
         {saving ? "กำลังบันทึก..." : "บันทึกโปรไฟล์"}
       </button>
     </form>
