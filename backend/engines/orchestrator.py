@@ -18,6 +18,7 @@ from uuid import UUID
 from db.postgres import fetchrow
 from engines.eligibility_engine import check_eligibility
 from engines.prompt_composer import compose_dreamer_prompt, compose_tcas_prompt
+from engines.rag_engine import retrieve_context
 from memory.long_term_memory import save_message
 from memory.session_memory import append_to_chat_window, get_chat_window, get_user_session
 from models.model_router import get_model_config
@@ -56,13 +57,11 @@ async def handle_tcas_message(
     content: str,
     history: list[dict],
 ) -> str:
-    """Generate a Flow B (TCAS advisor) response grounded in SQL eligibility data.
-
-    Phase 6 RAG hook: insert retrieval between check_eligibility and compose_tcas_prompt.
-    """
+    """Generate a Flow B (TCAS advisor) response grounded in SQL eligibility data + RAG."""
     profile = await _load_user_profile(user_id)
     eligibility = await check_eligibility(user_id=user_id)
-    system_prompt = compose_tcas_prompt(profile, eligibility)
+    rag_context = await retrieve_context(content)
+    system_prompt = compose_tcas_prompt(profile, eligibility, rag_context)
     cfg = get_model_config("tcas_chat")
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": content}]
     return await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
