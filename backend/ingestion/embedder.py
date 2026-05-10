@@ -2,14 +2,11 @@
 
 Dense vector:  nomic-embed-text via ollama_client.embed() (768 dims).
 Sparse vector: BM25 via fastembed SparseTextEmbedding model "Qdrant/bm25".
-               fastembed is bundled with qdrant-client[fastembed].
 
-Both vectors are required for Qdrant hybrid search (prefetch + RRF fusion).
+Both vectors are stored in Qdrant for hybrid search (prefetch + RRF fusion).
 """
 
 from __future__ import annotations
-
-import asyncio
 
 from fastembed import SparseTextEmbedding
 from models.ollama_client import embed
@@ -28,9 +25,9 @@ def _get_sparse_model() -> SparseTextEmbedding:
 
 
 async def embed_chunks(chunks: list[dict]) -> list[dict]:
-    """Add dense_vector and sparse_vector to each chunk dict (in-place copy).
+    """Add dense_vector and sparse_vector to each chunk dict.
 
-    Processes dense embeddings sequentially to avoid overloading Ollama.
+    Dense embeddings are fetched sequentially from Ollama to avoid overloading it.
     Sparse BM25 vectors are computed locally via fastembed (no network call).
     """
     texts = [c["text"] for c in chunks]

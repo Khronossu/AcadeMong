@@ -2,30 +2,34 @@
 
 Retrieval pipeline (per CLAUDE.md §6.3):
   1. Metadata filter (year, university) applied at Qdrant query time.
-  2. Prefetch dense results (nomic-embed-text) + sparse BM25 results.
-  3. Single Qdrant query_points call fuses both via Reciprocal Rank Fusion.
-  4. Top-20 candidates sent to cross-encoder (BAAI/bge-reranker-base).
-  5. Returns top RERANKER_TOP_K chunk texts, each prefixed with source info.
+  2. Dense search (nomic-embed-text) + sparse BM25 search run in parallel.
+  3. Results merged via Reciprocal Rank Fusion (RRF, k=60).
+  4. Top-20 RRF candidates reranked by cross-encoder (BAAI/bge-reranker-base).
+  5. Returns top RERANKER_TOP_K chunk texts prefixed with source info.
 
-Graceful degradation: if Qdrant is unreachable, returns [] so tcas_rag
+Uses AsyncQdrantClient for non-blocking I/O in the FastAPI runtime.
+
+Graceful degradation: returns [] if Qdrant is unreachable so tcas_rag
 still functions from SQL eligibility data alone (no exception propagation).
 """
 
 from __future__ import annotations
 
+import asyncio
 import os
 
 from fastembed import SparseTextEmbedding
-from qdrant_client.models import Filter, FieldCondition, MatchValue, Prefetch, FusionQuery, Fusion
+from qdrant_client.http.models import FieldCondition, Filter, MatchValue, NamedSparseVector, NamedVector, SparseVector
 from sentence_transformers import CrossEncoder
 
-from db.qdrant_client import TCAS_COLLECTION, get_qdrant_client
+from db.qdrant_client import TCAS_COLLECTION, get_async_qdrant_client
 from models.ollama_client import embed
 
 _EMBEDDING_MODEL = "nomic-embed-text"
 _BM25_MODEL = "Qdrant/bm25"
 _RERANKER_MODEL = "BAAI/bge-reranker-base"
 _PREFETCH_K = 20
+_RRF_K = 60
 
 _sparse_model: SparseTextEmbedding | None = None
 _reranker: CrossEncoder | None = None
@@ -56,6 +60,28 @@ def _build_filter(filters: dict | None) -> Filter | None:
     return Filter(must=conditions) if conditions else None
 
 
+def _rrf_merge(
+    dense_hits: list,
+    sparse_hits: list,
+    k: int = _RRF_K,
+) -> list[tuple[float, object]]:
+    """Reciprocal Rank Fusion: merge two ranked lists into one by score."""
+    scores: dict[int, float] = {}
+    payloads: dict[int, object] = {}
+
+    for rank, hit in enumerate(dense_hits):
+        scores[hit.id] = scores.get(hit.id, 0.0) + 1.0 / (k + rank + 1)
+        payloads[hit.id] = hit.payload
+
+    for rank, hit in enumerate(sparse_hits):
+        scores[hit.id] = scores.get(hit.id, 0.0) + 1.0 / (k + rank + 1)
+        if hit.id not in payloads:
+            payloads[hit.id] = hit.payload
+
+    ranked = sorted(scores.items(), key=lambda x: x[1], reverse=True)
+    return [(score, payloads[pid]) for pid, score in ranked]
+
+
 async def retrieve_context(
     query: str,
     filters: dict | None = None,
@@ -74,40 +100,50 @@ async def retrieve_context(
         top_k = int(os.getenv("RERANKER_TOP_K", 3))
 
     try:
-        client = get_qdrant_client()
-
-        dense_vec = await embed(_EMBEDDING_MODEL, query)
-
-        sparse_model = _get_sparse_model()
-        sparse_result = next(sparse_model.embed([query]))
-        sparse_vec = {"indices": sparse_result.indices.tolist(), "values": sparse_result.values.tolist()}
-
+        client = get_async_qdrant_client()
         query_filter = _build_filter(filters)
 
-        results = client.query_points(
-            collection_name=TCAS_COLLECTION,
-            prefetch=[
-                Prefetch(query=dense_vec, using="dense", limit=_PREFETCH_K, filter=query_filter),
-                Prefetch(query=sparse_vec, using="sparse", limit=_PREFETCH_K, filter=query_filter),
-            ],
-            query=FusionQuery(fusion=Fusion.RRF),
-            limit=_PREFETCH_K,
-        ).points
+        dense_vec, sparse_result = await asyncio.gather(
+            embed(_EMBEDDING_MODEL, query),
+            asyncio.to_thread(lambda: next(_get_sparse_model().embed([query]))),
+        )
 
-        if not results:
+        sparse_vec = SparseVector(
+            indices=sparse_result.indices.tolist(),
+            values=sparse_result.values.tolist(),
+        )
+
+        dense_hits, sparse_hits = await asyncio.gather(
+            client.search(
+                collection_name=TCAS_COLLECTION,
+                query_vector=NamedVector(name="dense", vector=dense_vec),
+                query_filter=query_filter,
+                limit=_PREFETCH_K,
+                with_payload=True,
+            ),
+            client.search(
+                collection_name=TCAS_COLLECTION,
+                query_vector=NamedSparseVector(name="sparse", vector=sparse_vec),
+                query_filter=query_filter,
+                limit=_PREFETCH_K,
+                with_payload=True,
+            ),
+        )
+
+        merged = _rrf_merge(dense_hits, sparse_hits)
+        if not merged:
             return []
 
-        candidates = [(r.payload["text"], r.payload) for r in results]
+        candidates = [(payload["text"], payload) for _, payload in merged]
         pairs = [(query, text) for text, _ in candidates]
 
         reranker = _get_reranker()
-        scores = reranker.predict(pairs)
+        scores = await asyncio.to_thread(reranker.predict, pairs)
 
         ranked = sorted(zip(scores, candidates), key=lambda x: x[0], reverse=True)
 
         chunks = []
         for _, (text, payload) in ranked[:top_k]:
-            source = payload.get("source_url") or payload.get("source_path", "")
             university = payload.get("university") or ""
             page = payload.get("page", "?")
             prefix = f"[ที่มา: {university} หน้า {page}]" if university else f"[หน้า {page}]"

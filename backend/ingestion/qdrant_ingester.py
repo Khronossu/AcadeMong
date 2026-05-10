@@ -19,7 +19,6 @@ from qdrant_client.models import (
     SparseIndexParams,
     SparseVectorParams,
     VectorParams,
-    VectorsConfig,
 )
 
 from db.qdrant_client import TCAS_COLLECTION
