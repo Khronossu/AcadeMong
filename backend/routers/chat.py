@@ -22,6 +22,7 @@ from db.postgres import execute, fetch, fetchrow
 from engines.eligibility_engine import check_eligibility, check_eligibility_for_major
 from engines.mode_selector import validate_mode
 from engines.orchestrator import handle_message
+from guardrails.input_gate import detect_injection, validate_topic
 from memory.long_term_memory import (
     create_chat_session,
     get_messages,
@@ -123,6 +124,11 @@ async def send_message(
     session = await get_session(session_id)
     if not session or session["user_id"] != user["id"]:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+
+    if detect_injection(body.content):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message contains disallowed patterns.")
+    validate_topic(body.content)  # advisory — logs warning, never blocks
+
     response_text = await handle_message(
         session_id=session_id,
         user_id=user["id"],
