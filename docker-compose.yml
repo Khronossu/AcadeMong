@@ -67,6 +67,8 @@ services:
     build: ./frontend
     ports:
       - "3000:3000"
+    environment:
+      - VITE_API_TARGET=http://fastapi:8000
     depends_on:
       - fastapi
     restart: unless-stopped
