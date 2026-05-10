@@ -12,6 +12,7 @@ import os
 from qdrant_client import AsyncQdrantClient, QdrantClient
 
 TCAS_COLLECTION = "tcas_docs"
+CAREERS_COLLECTION = "careers"
 
 _client: QdrantClient | None = None
 _async_client: AsyncQdrantClient | None = None
