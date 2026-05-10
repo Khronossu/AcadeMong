@@ -27,11 +27,15 @@ Default to Thai if unclear.\
 """
 
 
-def compose_dreamer_prompt(user_profile: dict) -> str:
+def compose_dreamer_prompt(
+    user_profile: dict,
+    career_suggestions: list[dict] | None = None,
+) -> str:
     """System prompt for Flow A — Career Dreamer.
 
     Builds: MASTER + student profile snippet + career-coaching instruction.
-    No eligibility data here; this mode is about exploring interests and strengths.
+    If career_suggestions is provided (after ≥2 turns), injects them as
+    <career_suggestions> so the model can naturally weave them into the conversation.
     """
     lines = [_MASTER_SYSTEM, "\n## Student Profile"]
     gpax = user_profile.get("gpax")
@@ -43,11 +47,21 @@ def compose_dreamer_prompt(user_profile: dict) -> str:
     if not gpax and not school:
         lines.append("- (No profile data on file yet)")
 
+    if career_suggestions:
+        lines.append("\n<career_suggestions>")
+        lines.append("อาชีพที่เหมาะสมกับโปรไฟล์ของนักเรียน (จัดอันดับตามความเข้ากัน):")
+        for i, c in enumerate(career_suggestions, 1):
+            salary = f" | เงินเดือนเฉลี่ย {c['avg_salary_thb']:,} บาท" if c.get("avg_salary_thb") else ""
+            lines.append(f"  {i}. {c['title']} (คะแนน {c['score']:.2f}){salary}")
+        lines.append("</career_suggestions>")
+
     lines.append(
         "\n## Your role\n"
         "Help this student explore their interests, strengths, and career aspirations. "
         "Ask thoughtful, open-ended questions. Suggest fields of study that match their "
-        "interests once you have enough context. Be encouraging and realistic."
+        "interests once you have enough context. Be encouraging and realistic. "
+        "If <career_suggestions> are provided, gently weave them into the conversation "
+        "as possibilities to discuss — do not read out the list mechanically."
     )
     return "\n".join(lines)
 
