@@ -26,12 +26,12 @@ async def chat(model, messages, temperature, top_p, max_tokens):
 async def embed(model, text):
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(
-            f'{OLLAMA_BASE_URL}/api/embedding',
+            f'{OLLAMA_BASE_URL}/api/embed',
             json={
                 "model": model,
-                "prompt": text
+                "input": text
             }
         )
         response.raise_for_status()
-        return response.json()['embedding']
+        return response.json()['embeddings'][0]
 
