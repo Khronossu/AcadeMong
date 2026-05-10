@@ -28,7 +28,11 @@ logger = logging.getLogger(__name__)
 # Injection detection (CLAUDE.md §17 Layer 2)
 # ---------------------------------------------------------------------------
 
-_INJECTION_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
+# Patterns are NFKC-normalized at compile time so they match normalized input.
+# Thai SARA AM (U+0E33, ำ) decomposes under NFKC to U+0E4D + U+0E32 (็า);
+# without this, Thai patterns containing ำ silently fail to match.
+_INJECTION_PATTERNS: list[re.Pattern] = [
+    re.compile(unicodedata.normalize("NFKC", p), re.IGNORECASE) for p in [
     r"ignore\s+previous",
     r"you\s+are\s+now",
     r"system\s*:",
