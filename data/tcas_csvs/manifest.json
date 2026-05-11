@@ -1,0 +1,88 @@
+{
+  "generated_at": "2026-05-09T10:25:38.834663+00:00",
+  "version": "2026-05-09",
+  "files": {
+    "universities.csv": {
+      "rows": 5,
+      "columns": [
+        "university_slug",
+        "university_id",
+        "university_name_th",
+        "university_name_en"
+      ]
+    },
+    "faculties.csv": {
+      "rows": 123,
+      "columns": [
+        "university_slug",
+        "university_id",
+        "faculty_id",
+        "faculty_name_th",
+        "faculty_name_en"
+      ]
+    },
+    "majors.csv": {
+      "rows": 820,
+      "columns": [
+        "program_id",
+        "university_slug",
+        "university_id",
+        "faculty_id",
+        "campus_id",
+        "campus_name_th",
+        "campus_name_en",
+        "program_name_th",
+        "program_name_en",
+        "program_type_id",
+        "program_type_name_th",
+        "field_id",
+        "field_name_th",
+        "field_name_en",
+        "cost",
+        "graduate_rate"
+      ]
+    },
+    "admission_projects.csv": {
+      "rows": 4383,
+      "columns": [
+        "program_id",
+        "project_id",
+        "major_id",
+        "project_name_th",
+        "round_type",
+        "year",
+        "receive_student_number",
+        "min_gpax",
+        "min_total_score",
+        "only_formal",
+        "only_international",
+        "only_vocational",
+        "link"
+      ]
+    },
+    "subject_requirements.csv": {
+      "rows": 3130,
+      "columns": [
+        "program_id",
+        "project_id",
+        "major_id",
+        "year",
+        "subject",
+        "weight_percent"
+      ]
+    },
+    "historical_cutoffs.csv": {
+      "rows": 2838,
+      "columns": [
+        "program_id",
+        "tcas_year",
+        "year_ce",
+        "seats",
+        "applicants",
+        "accepted",
+        "min_score",
+        "max_score"
+      ]
+    }
+  }
+}

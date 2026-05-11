@@ -1,0 +1,124 @@
+university_slug,university_id,faculty_id,faculty_name_th,faculty_name_en
+chulalongkorn,001,21,คณะวิศวกรรมศาสตร์,Faculty of Engineering
+chulalongkorn,001,22,คณะอักษรศาสตร์,Faculty of Arts
+chulalongkorn,001,23,คณะวิทยาศาสตร์,Faculty of Science
+chulalongkorn,001,24,คณะรัฐศาสตร์,Faculty of Political Science
+chulalongkorn,001,25,คณะสถาปัตยกรรมศาสตร์,Faculty of Architecture
+chulalongkorn,001,26,คณะพาณิชยศาสตร์และการบัญชี,Faculty of Commerce and Accountancy
+chulalongkorn,001,27,คณะครุศาสตร์,Faculty of Education
+chulalongkorn,001,28,คณะนิเทศศาสตร์,Faculty of Communication Arts
+chulalongkorn,001,29,คณะเศรษฐศาสตร์,Faculty of Economics
+chulalongkorn,001,30,คณะแพทยศาสตร์,Faculty of Medicine
+chulalongkorn,001,31,คณะสัตวแพทยศาสตร์,Faculty of Veterinary Science
+chulalongkorn,001,32,คณะทันตแพทยศาสตร์,Faculty of Dentistry
+chulalongkorn,001,33,คณะเภสัชศาสตร์,Faculty of Pharmaceutical Sciences
+chulalongkorn,001,34,คณะนิติศาสตร์,Faculty of Law
+chulalongkorn,001,35,คณะศิลปกรรมศาสตร์,Faculty of Fine and Applied Arts
+chulalongkorn,001,37,คณะสหเวชศาสตร์,Faculty of Allied Health Sciences
+chulalongkorn,001,38,คณะจิตวิทยา,Faculty of Psychology
+chulalongkorn,001,39,คณะวิทยาศาสตร์การกีฬา,Faculty of Sports Science
+chulalongkorn,001,40,สำนักวิชาทรัพยากรการเกษตร,School of Agricultural Resources
+chulalongkorn,001,56,สถาบันนวัตกรรมบูรณาการแห่งจุฬาลงกรณ์มหาวิทยาลัย,School of Integrated Innovation
+kasetsart,002,01,คณะเกษตร,Agriculture
+kasetsart,002,02,คณะประมง,Fisheries
+kasetsart,002,03,คณะวนศาสตร์,Forestry
+kasetsart,002,04,คณะวิทยาศาสตร์,Science
+kasetsart,002,05,คณะวิศวกรรมศาสตร์,Engineering
+kasetsart,002,06,คณะศึกษาศาสตร์,Education
+kasetsart,002,07,คณะเศรษฐศาสตร์,Economics
+kasetsart,002,08,คณะสังคมศาสตร์,Social Sciences
+kasetsart,002,09,คณะสัตวแพทยศาสตร์,Veterinary Medicine
+kasetsart,002,10,คณะอุตสาหกรรมเกษตร,Agro-Industry
+kasetsart,002,11,คณะมนุษยศาสตร์,Humanities
+kasetsart,002,12,คณะบริหารธุรกิจ,Business Administration
+kasetsart,002,13,คณะเทคนิคการสัตวแพทย์,Veterinary Technology
+kasetsart,002,14,คณะสถาปัตยกรรมศาสตร์,Architecture
+kasetsart,002,15,คณะสิ่งแวดล้อม,Environment
+kasetsart,002,16,วิทยาลัยบูรณาการศาสตร์,Integrate Sciences College
+kasetsart,002,17,วิทยาลัยการชลประทาน,IRRIGATION COLLEGE
+kasetsart,002,19,คณะเกษตร กำแพงแสน,Agriculture at Kamphaeng Saen
+kasetsart,002,20,คณะวิศวกรรมศาสตร์ กำแพงแสน,Engineering at Kamphaeng Saen
+kasetsart,002,21,คณะศึกษาศาสตร์และพัฒนศาสตร์,Education and Development Sciences
+kasetsart,002,22,คณะศิลปศาสตร์และวิทยาศาสตร์,Liberal Arts and Science
+kasetsart,002,23,คณะวิทยาศาสตร์การกีฬาและสุขภาพ,Sports and Health Science
+kasetsart,002,24,คณะเศรษฐศาสตร์ ศรีราชา,Economics at Sri Racha
+kasetsart,002,25,คณะพาณิชยนาวีนานาชาติ,Faculty of International Maritime Studies
+kasetsart,002,26,คณะวิทยาการจัดการ,Management Science
+kasetsart,002,27,คณะวิทยาศาสตร์ ศรีราชา,Science at Sriracha
+kasetsart,002,28,คณะวิศวกรรมศาสตร์ ศรีราชา,Engineering at Sri Racha
+kasetsart,002,29,คณะทรัพยากรธรรมชาติและอุตสาหกรรมเกษตร,Natural Resources and Agro-Industry
+kasetsart,002,30,คณะวิทยาศาสตร์และวิศวกรรมศาสตร์,Science and Engineering
+kasetsart,002,31,คณะศิลปศาสตร์และวิทยาการจัดการ,Art and Science Management
+kasetsart,002,32,คณะสาธารณสุขศาสตร์,Public Health
+kasetsart,002,33,คณะอุตสาหกรรมบริการ,Faculty of Hospitality Industry
+kasetsart,002,34,คณะแพทยศาสตร์,Medicine
+kasetsart,002,35,คณะสหวิทยาการจัดการและเทคโนโลยี,Faculty of Interdisciplinary Management and Technology
+kasetsart,002,36,คณะพยาบาลศาสตร์,Nursing
+kasetsart,002,37,คณะเภสัชศาสตร์,Pharmaceutical Sciences
+thammasat,005,01,คณะนิติศาสตร์,Laws
+thammasat,005,02,คณะพาณิชยศาสตร์และการบัญชี,ThammasatBusinessSchool
+thammasat,005,03,คณะรัฐศาสตร์,PoliticalScience
+thammasat,005,04,คณะเศรษฐศาสตร์,Economics
+thammasat,005,05,คณะสังคมสงเคราะห์ศาสตร์,SocialAdministration
+thammasat,005,06,คณะศิลปศาสตร์,LiberalArts
+thammasat,005,07,คณะวารสารศาสตร์และสื่อสารมวลชน,JournalismandMassCommunication
+thammasat,005,08,คณะสังคมวิทยาและมานุษยวิทยา,SociologyandAnthropology
+thammasat,005,09,คณะวิทยาศาสตร์และเทคโนโลยี,ScienceandTechnology
+thammasat,005,10,คณะวิศวกรรมศาสตร์,Engineering
+thammasat,005,11,คณะแพทยศาสตร์,Medicine
+thammasat,005,12,คณะสหเวชศาสตร์,AlliedHealthSciences
+thammasat,005,13,คณะทันตแพทยศาสตร์,Dentistry
+thammasat,005,14,คณะพยาบาลศาสตร์,Nursing
+thammasat,005,15,คณะศิลปกรรมศาสตร์,FineandAppiledArts
+thammasat,005,16,คณะสถาปัตยกรรมศาสตร์และการผังเมือง,ArchitectureandPlanning
+thammasat,005,17,คณะสาธารณสุขศาสตร์,PublicHealth
+thammasat,005,18,คณะเภสัชศาสตร์,Pharmacy
+thammasat,005,19,คณะวิทยาการเรียนรู้และศึกษาศาสตร์,LearningSciencesandEducation
+thammasat,005,22,สถาบันเทคโนโลยีนานาชาติสิรินธร,SirindhornInternationalInstituteofTechnology
+thammasat,005,23,วิทยาลัยนวัตกรรม,CollegeofInnovation
+thammasat,005,24,วิทยาลัยสหวิทยาการ,CollegeofInterdisciplinaryStudies
+thammasat,005,27,วิทยาลัยนานาชาติปรีดีพนมยงค์,PridiBanomyongInternationalCollege
+thammasat,005,28,วิทยาลัยโลกคดีศึกษา,SchoolofGlobalStudies
+thammasat,005,29,วิทยาลัยแพทยศาสตร์นานาชาติจุฬาภรณ์,ChulabhornInternationalCollegeofMedicine
+thammasat,005,30,วิทยาลัยพัฒนศาสตร์ป๋วยอึ๊งภากรณ์,PueyUngphakornSchoolofDevelopmentStudies
+mahidol,006,01,คณะแพทยศาสตร์ศิริราชพยาบาล,Faculty of Medicine Siriraj Hospital
+mahidol,006,02,คณะแพทยศาสตร์โรงพยาบาลรามาธิบดี,Faculty of Medicine Ramathibodi Hospital
+mahidol,006,03,คณะเภสัชศาสตร์,Faculty of Pharmacy
+mahidol,006,04,คณะทันตแพทยศาสตร์,Faculty of Dentistry
+mahidol,006,05,คณะวิทยาศาสตร์,Faculty of Science
+mahidol,006,06,คณะเทคนิคการแพทย์,Faculty of Medical Technology
+mahidol,006,07,คณะสาธารณสุขศาสตร์,Faculty of Public Health
+mahidol,006,08,คณะพยาบาลศาสตร์,Faculty of Nursing
+mahidol,006,09,คณะกายภาพบำบัด,Faculty of Physical Therapy
+mahidol,006,10,คณะสัตวแพทยศาสตร์,Faculty of Veterinary Science
+mahidol,006,11,คณะสิ่งแวดล้อมและทรัพยากรศาสตร์,Faculty of Environment and Resource Studies
+mahidol,006,12,คณะวิศวกรรมศาสตร์,Faculty of Engineering
+mahidol,006,13,คณะศิลปศาสตร์,Faculty of Liberal Arts
+mahidol,006,14,คณะสังคมศาสตร์และมนุษย์ศาสตร์,Faculty of Social Science and Humanities
+mahidol,006,15,คณะเทคโนโลยีสารสนเทศและการสื่อสาร,Faculty of Information and Communication Technology
+mahidol,006,16,วิทยาลัยศาสนศึกษา,College of Religious Studies
+mahidol,006,17,วิทยาลัยวิทยาศาสตร์และเทคโนโลยีการกีฬา,College of Sports Science and Technology
+mahidol,006,19,วิทยาเขตกาญจนบุรี,Kanchanaburi Campus
+mahidol,006,20,วิทยาเขตนครสวรรค์,Nakhonsawan Campus
+mahidol,006,21,วิทยาเขตอำนาจเจริญ,Amnatcharoen Campus
+mahidol,006,22,ศูนย์แพทยศาสตรศึกษาชั้นคลินิก รพ.มหาราชนครราชสีมา,Maharat Nakhonratchasima Hospital; Medical Education Center
+swu,009,01,คณะมนุษยศาสตร์,Faculty of Humanities
+swu,009,02,คณะวิทยาศาสตร์,Faculty of Science
+swu,009,03,คณะสังคมศาสตร์,Faculty of Social Science
+swu,009,04,คณะพลศึกษา,"Faculty of Physical Education, Sports and Health (PESH)"
+swu,009,05,คณะศึกษาศาสตร์,Faculty of Education
+swu,009,06,คณะพยาบาลศาสตร์,Faculty of Nursing
+swu,009,07,คณะแพทยศาสตร์,Faculty of Medicine
+swu,009,09,คณะวิศวกรรมศาสตร์,Faculty of Engineering
+swu,009,10,คณะศิลปกรรมศาสตร์,Faculty of Fine Arts
+swu,009,11,คณะทันตแพทยศาสตร์,Faculty Of Dentistry
+swu,009,12,คณะเภสัชศาสตร์,Faculty of Pharmacy
+swu,009,30,วิทยาลัยนวัตกรรมสื่อสารสังคม,College of Social Communication Innovation
+swu,009,47,วิทยาลัยโพธิวิชชาลัย,College of Creative Agriculture for Society
+swu,009,49,คณะเศรษฐศาสตร์,Faculty of Economics
+swu,009,66,คณะวัฒนธรรมสิ่งแวดล้อมและการท่องเที่ยวเชิงนิเวศ,Faculty of Environmental Culture and Ecotourism
+swu,009,67,คณะกายภาพบำบัด,Faculty of Physical Therapy
+swu,009,68,คณะบริหารธุรกิจเพื่อสังคม,Faculty of Business Administration for Society
+swu,009,69,วิทยาลัยอุตสาหกรรมสร้างสรรค์,College of Creative Industry
+swu,009,70,วิทยาลัยนานาชาติเพื่อศึกษาความยั่งยืน,International College for Sustainability Studies
+swu,009,71,คณะเทคโนโลยีและนวัตกรรมผลิตภัณฑ์การเกษตร,Faculty of Agricultural Product Innovation And Technology

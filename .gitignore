@@ -6,8 +6,6 @@ node_modules/
 dist/
 build/
 .DS_Store
-data/**
-!data/pdfs/
 data/pdfs/**
 !data/pdfs/manifest.json
 !data/career/
