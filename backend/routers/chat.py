@@ -29,6 +29,9 @@ from memory.long_term_memory import (
     get_session,
     save_message,
 )
+from memory.session_memory import clear_chat_window, clear_user_session
+from engines.summarizer import summarize_session
+import asyncio
 
 router = APIRouter()
 
@@ -152,6 +155,28 @@ async def get_message_history(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
     messages = await get_messages(session_id)
     return HistoryResponse(session_id=str(session_id), messages=messages)
+
+
+@router.post(
+    "/{session_id}/end",
+    summary="End a session, trigger summarization and clear cache",
+)
+async def end_session(
+    session_id: UUID,
+    user: dict = Depends(get_current_user),
+):
+    session = await get_session(session_id)
+    if not session or session["user_id"] != user["id"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    
+    # Trigger summarization in the background so we don't block the client
+    asyncio.create_task(summarize_session(user["id"], session_id))
+    
+    # Clear the session cache
+    await clear_chat_window(str(user["id"]), str(session_id))
+    await clear_user_session(str(user["id"]))
+    
+    return {"status": "ok", "message": "Session ended and summarization started"}
 
 
 # ── Eligibility endpoints ──────────────────────────────────────────────────────

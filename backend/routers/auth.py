@@ -1,12 +1,14 @@
 from uuid import UUID
 
 import asyncpg
-from fastapi import APIRouter, HTTPException, status
+from fastapi import APIRouter, HTTPException, status, Depends
 from pydantic import BaseModel, Field
 
-from auth.firebase_admin import verify_token
+from auth.firebase_admin import verify_token, get_current_user
 from db.postgres import fetchrow, execute
-from memory.session_memory import set_user_session
+from memory.session_memory import set_user_session, clear_user_session, clear_chat_window
+from engines.summarizer import summarize_session
+import asyncio
 
 router = APIRouter()
 
@@ -144,3 +146,30 @@ async def login_user(req: LoginRequest):
         user_id=user_id,
         username=user_record["username"]
     )
+
+
+@router.post(
+    "/logout",
+    summary="Log out a user",
+    description="Clears the user profile from Redis and triggers summarization for the most recent chat session.",
+)
+async def logout_user(user: dict = Depends(get_current_user)):
+    user_id = user["id"]
+    
+    # Find most recent chat session to summarize and clear
+    recent_session = await fetchrow(
+        "SELECT id FROM chat_sessions WHERE user_id = $1 ORDER BY created_at DESC LIMIT 1",
+        user_id
+    )
+    
+    if recent_session:
+        session_id = recent_session["id"]
+        # Trigger background summarization
+        asyncio.create_task(summarize_session(user_id, session_id))
+        # Clear chat window
+        await clear_chat_window(str(user_id), str(session_id))
+        
+    # Clear global user session
+    await clear_user_session(str(user_id))
+    
+    return {"status": "ok", "message": "Logged out successfully."}
