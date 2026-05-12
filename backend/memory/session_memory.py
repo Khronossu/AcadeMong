@@ -62,6 +62,14 @@ async def get_user_session(user_id: str) -> dict | None:
     return json.loads(raw) if raw else None
 
 
+async def clear_user_session(user_id: str):
+    """Clear the cached profile session."""
+    if not redis_pool:
+        raise ConnectionError("Redis pool is not initialized.")
+    session_key = f"session:{user_id}:profile"
+    await redis_pool.delete(session_key)
+
+
 _WINDOW_SIZE = 10  # max messages kept hot in Redis per session
 
 
@@ -91,6 +99,15 @@ async def append_to_chat_window(user_id: str, session_id: str, role: str, conten
     if len(messages) > _WINDOW_SIZE:
         messages = messages[-_WINDOW_SIZE:]
     await set_chat_window(user_id, session_id, messages, ttl=ttl)
+
+
+async def clear_chat_window(user_id: str, session_id: str):
+    """Clear the chat window and associated signals from Redis."""
+    if not redis_pool:
+        raise ConnectionError("Redis pool is not initialized.")
+    window_key = f"session:{user_id}:{session_id}:window"
+    signals_key = f"session:{user_id}:{session_id}:signals"
+    await redis_pool.delete(window_key, signals_key)
 
 
 _SIGNALS_TTL = 7200

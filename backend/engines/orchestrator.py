@@ -31,6 +31,8 @@ from memory.session_memory import (
 )
 from models.model_router import get_model_config
 from models.ollama_client import chat
+from engines.summarizer import summarize_session
+import asyncio
 
 
 _COMPARISON_KW = ("เปรียบ", "compare", " vs ", "ต่าง", "ดีกว่า", "เทียบ", "versus")
@@ -135,5 +137,10 @@ async def handle_message(
 
     await append_to_chat_window(str(user_id), str(session_id), "user", content)
     await append_to_chat_window(str(user_id), str(session_id), "assistant", response)
+
+    # Trigger periodic background summarization (every 5 turns)
+    signals = await get_signals(str(user_id), str(session_id))
+    if signals.get("total_count", 0) > 0 and signals["total_count"] % 5 == 0:
+        asyncio.create_task(summarize_session(user_id, session_id))
 
     return response
