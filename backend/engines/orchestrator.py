@@ -18,7 +18,7 @@ from uuid import UUID
 from db.postgres import fetchrow
 from engines.career_matcher import get_career_suggestions
 from engines.eligibility_engine import check_eligibility
-from engines.prompt_composer import compose_dreamer_prompt, compose_tcas_prompt
+from prompts.prompt_composer import compose_dreamer_prompt, compose_tcas_prompt
 from engines.rag_engine import retrieve_context
 from guardrails.numeric_validator import validate_numeric_claims
 from memory.long_term_memory import save_message
