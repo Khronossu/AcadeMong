@@ -74,17 +74,29 @@ export default function EligibilityOverview({ results, getToken }) {
     const topEligible = eligible.slice(0, 8);
     if (!topEligible.length) return;
 
+    const controller = new AbortController();
     setLoadingTrend(true);
-    getToken().then((token) =>
-      fetch("/api/chat/cutoffs/batch", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ ids: topEligible.map((r) => r.admission_project_id) }),
-      })
-    ).then((r) => r.json())
-     .then((data) => setTrendData(data.cutoffs || {}))
-     .catch(() => setTrendData({}))
-     .finally(() => setLoadingTrend(false));
+
+    (async () => {
+      try {
+        const token = await getToken();
+        if (controller.signal.aborted) return;
+        const res = await fetch("/api/chat/cutoffs/batch", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ ids: topEligible.map((r) => r.admission_project_id) }),
+          signal: controller.signal,
+        });
+        const data = await res.json();
+        setTrendData(data.cutoffs || {});
+      } catch (e) {
+        if (e.name !== "AbortError") setTrendData({});
+      } finally {
+        if (!controller.signal.aborted) setLoadingTrend(false);
+      }
+    })();
+
+    return () => controller.abort();
   }, [open]);
 
   // Build multi-line chart data

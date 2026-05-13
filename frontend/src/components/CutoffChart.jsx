@@ -195,22 +195,26 @@ export default function CutoffChart({ admissionProjectId, getToken }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const controller = new AbortController();
     async function load() {
       try {
         const token = await getToken();
+        if (controller.signal.aborted) return;
         const res = await fetch(`/api/chat/cutoffs/${admissionProjectId}`, {
           headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
         });
         if (!res.ok) { setData([]); return; }
         const json = await res.json();
         setData(json.cutoffs || []);
-      } catch {
-        setData([]);
+      } catch (e) {
+        if (e.name !== "AbortError") setData([]);
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
     load();
+    return () => controller.abort();
   }, [admissionProjectId]);
 
   if (loading) return <div style={s.placeholder}>กำลังโหลดข้อมูลสถิติย้อนหลัง...</div>;

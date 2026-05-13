@@ -4,6 +4,7 @@ import ProfileForm from "./components/ProfileForm";
 import EligibilityResults from "./components/EligibilityResults";
 import ChatInterface from "./components/ChatInterface";
 import CareerPathView from "./components/CareerPathView";
+import ErrorBoundary from "./components/ErrorBoundary";
 
 const TABS = [
   { key: "chat",        label: "แชทกับ AI" },
@@ -44,12 +45,14 @@ function AppContent({ getToken, username, signOut }) {
       </nav>
 
       <main style={tab === "chat" ? styles.mainFull : styles.main}>
-        {tab === "chat" && <ChatInterface getToken={getToken} />}
-        {tab === "profile" && (
-          <ProfileForm getToken={getToken} onSaved={() => setProfileSaved(true)} />
-        )}
-        {tab === "eligibility" && <EligibilityResults getToken={getToken} />}
-        {tab === "careers"     && <CareerPathView getToken={getToken} />}
+        <ErrorBoundary key={tab}>
+          {tab === "chat" && <ChatInterface getToken={getToken} />}
+          {tab === "profile" && (
+            <ProfileForm getToken={getToken} onSaved={() => setProfileSaved(true)} />
+          )}
+          {tab === "eligibility" && <EligibilityResults getToken={getToken} />}
+          {tab === "careers"     && <CareerPathView getToken={getToken} />}
+        </ErrorBoundary>
       </main>
     </div>
   );

@@ -5,24 +5,29 @@ export default function CareerPathView({ getToken }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => { load(); }, []);
-
-  async function load() {
-    setLoading(true);
-    try {
-      const token = await getToken();
-      const res = await fetch("/api/profile/career-recommendations", {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!res.ok) throw new Error(res.status);
-      const data = await res.json();
-      setRecs(data.recommendations || []);
-    } catch (e) {
-      setError("โหลดข้อมูลไม่สำเร็จ: " + e.message);
-    } finally {
-      setLoading(false);
+  useEffect(() => {
+    const controller = new AbortController();
+    async function load() {
+      setLoading(true);
+      try {
+        const token = await getToken();
+        if (controller.signal.aborted) return;
+        const res = await fetch("/api/profile/career-recommendations", {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(res.status);
+        const data = await res.json();
+        setRecs(data.recommendations || []);
+      } catch (e) {
+        if (e.name !== "AbortError") setError("โหลดข้อมูลไม่สำเร็จ: " + e.message);
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
     }
-  }
+    load();
+    return () => controller.abort();
+  }, []);
 
   if (loading) return <p style={s.hint}>กำลังโหลด...</p>;
   if (error) return <p style={{ color: "#c33" }}>{error}</p>;
