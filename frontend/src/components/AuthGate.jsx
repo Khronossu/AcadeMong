@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { useAuth } from "../hooks/useAuth";
 import { t } from "../theme";
+import Icon from "./Icon";
 
 function SignInScreen({ onSignIn }) {
   return (
     <div style={s.screen}>
       <div style={s.card}>
-        <div style={s.logoMark}>🎓</div>
+        <div style={s.logoMark}><Icon name="graduation" size={40} color={t.accent} /></div>
         <h1 style={s.title}>AcadeMong</h1>
         <p style={s.sub}>ผู้ช่วย AI สำหรับการเลือกคณะและวางแผนอาชีพ</p>
         <button
@@ -38,7 +39,7 @@ function RegisterScreen({ onRegister, error }) {
   return (
     <div style={s.screen}>
       <div style={s.card}>
-        <div style={s.logoMark}>🎓</div>
+        <div style={s.logoMark}><Icon name="graduation" size={40} color={t.accent} /></div>
         <h1 style={s.title}>ตั้งชื่อผู้ใช้</h1>
         <p style={s.sub}>เลือก username สำหรับบัญชีของคุณ</p>
         <form onSubmit={handle}>
@@ -64,7 +65,7 @@ function LoadingScreen() {
   return (
     <div style={s.screen}>
       <div style={{ ...s.card, textAlign: "center" }}>
-        <div style={{ fontSize: 32, marginBottom: 12 }}>⏳</div>
+        <div style={{ marginBottom: 12 }}><Icon name="hourglass" size={32} color={t.text3} /></div>
         <p style={{ color: t.text3, fontSize: 14 }}>กำลังโหลด…</p>
       </div>
     </div>

@@ -1,4 +1,5 @@
 import { Component } from "react";
+import Icon from "./Icon";
 
 export default class ErrorBoundary extends Component {
   constructor(props) {
@@ -18,7 +19,7 @@ export default class ErrorBoundary extends Component {
     if (this.state.crashed) {
       return (
         <div style={s.box}>
-          <div style={s.icon}>⚠️</div>
+          <div style={s.icon}><Icon name="warning" size={32} color="#a07830" /></div>
           <div style={s.msg}>{this.props.fallback || "เกิดข้อผิดพลาด กรุณาลองใหม่"}</div>
           <button style={s.btn} onClick={() => this.setState({ crashed: false })}>
             ลองอีกครั้ง

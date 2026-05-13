@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { t } from "../theme";
+import Icon from "./Icon";
 
 export default function ConfirmDialog({ message, confirmLabel = "ลบ", onConfirm, onCancel }) {
   // Close on Escape
@@ -12,7 +13,7 @@ export default function ConfirmDialog({ message, confirmLabel = "ลบ", onConf
   return (
     <div style={s.overlay} onClick={onCancel}>
       <div style={s.dialog} onClick={(e) => e.stopPropagation()}>
-        <div style={s.icon}>🗑️</div>
+        <div style={s.icon}><Icon name="trash" size={32} color={t.fail} /></div>
         <div style={s.message}>{message}</div>
         <div style={s.actions}>
           <button style={s.cancelBtn} onClick={onCancel}>ยกเลิก</button>

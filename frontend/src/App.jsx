@@ -9,13 +9,14 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import ConfirmDialog from "./components/ConfirmDialog";
 import { t } from "./theme";
 import { useWindowSize, isMobile } from "./hooks/useWindowSize";
+import Icon from "./components/Icon";
 
 const NAV = [
-  { key: "chat",        icon: "💬", label: "แชท" },
-  { key: "profile",     icon: "👤", label: "โปรไฟล์" },
-  { key: "eligibility", icon: "✅", label: "คุณสมบัติ" },
-  { key: "saved",       icon: "📌", label: "บันทึก" },
-  { key: "careers",     icon: "💼", label: "อาชีพ" },
+  { key: "chat",        iconName: "chat",          label: "แชท" },
+  { key: "profile",     iconName: "person",         label: "โปรไฟล์" },
+  { key: "eligibility", iconName: "check-circle",   label: "คุณสมบัติ" },
+  { key: "saved",       iconName: "bookmark",       label: "บันทึก" },
+  { key: "careers",     iconName: "briefcase",      label: "อาชีพ" },
 ];
 
 function AppContent({ getToken, username, signOut }) {
@@ -48,7 +49,7 @@ function AppContent({ getToken, username, signOut }) {
   const sidebar = (
     <aside style={{ ...s.sidebar, ...(mobile ? s.sidebarMobile : {}), ...(mobile && !sidebarOpen ? s.sidebarHidden : {}) }}>
       <div style={s.logoRow}>
-        <div style={s.logoMark}>🎓</div>
+        <div style={s.logoMark}><Icon name="graduation" size={20} color="#fff" /></div>
         <div>
           <div style={s.logoName}>AcadeMong</div>
           <div style={s.logoSub}>AI Advisor</div>
@@ -59,19 +60,19 @@ function AppContent({ getToken, username, signOut }) {
       </div>
 
       <div style={s.navSection}>
-        {NAV.map(({ key, icon, label }) => (
+        {NAV.map(({ key, iconName, label }) => (
           <button
             key={key}
             style={{ ...s.navItem, ...(tab === key ? s.navActive : {}) }}
             onClick={() => { setTab(key); if (mobile) setSidebarOpen(false); }}
           >
-            <span style={s.navIcon}>{icon}</span>
+            <span style={s.navIcon}><Icon name={iconName} size={16} /></span>
             <span style={s.navLabel}>{label}</span>
           </button>
         ))}
         <div style={s.navDivider} />
         <button style={s.navItem} onClick={() => { setTab("settings"); if (mobile) setSidebarOpen(false); }}>
-          <span style={s.navIcon}>⚙️</span>
+          <span style={s.navIcon}><Icon name="gear" size={16} /></span>
           <span style={s.navLabel}>ตั้งค่า</span>
         </button>
       </div>
@@ -137,7 +138,7 @@ function AppContent({ getToken, username, signOut }) {
           <div style={s.mobileTopBar}>
             <button style={s.hamburger} onClick={() => setSidebarOpen(true)}>☰</button>
             <div style={s.mobileTitle}>
-              {NAV.find((n) => n.key === tab)?.icon} {NAV.find((n) => n.key === tab)?.label}
+              <Icon name={NAV.find((n) => n.key === tab)?.iconName} size={20} /> {NAV.find((n) => n.key === tab)?.label}
             </div>
             <div style={{ width: 36 }} />
           </div>
@@ -175,13 +176,13 @@ function AppContent({ getToken, username, signOut }) {
         {/* Bottom tab nav — inside mainWrap so it stacks at the bottom of the column */}
         {mobile && (
           <nav style={s.bottomNav}>
-            {NAV.map(({ key, icon, label }) => (
+            {NAV.map(({ key, iconName, label }) => (
               <button
                 key={key}
                 style={{ ...s.bottomNavItem, ...(tab === key ? s.bottomNavActive : {}) }}
                 onClick={() => setTab(key)}
               >
-                <span style={{ fontSize: 26 }}>{icon}</span>
+                <Icon name={iconName} size={26} />
                 <span style={{ fontSize: 13, marginTop: 2 }}>{label}</span>
               </button>
             ))}
@@ -284,7 +285,7 @@ const s = {
   sidebarHidden: { transform: "translateX(-100%)" },
 
   logoRow: { padding: "14px 16px", borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", gap: 10, flexShrink: 0 },
-  logoMark: { width: 36, height: 36, background: t.accent, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 },
+  logoMark: { width: 34, height: 34, background: t.accent, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 },
   logoName: { fontSize: 22, fontWeight: 800, color: t.text1, letterSpacing: "-.4px" },
   logoSub:  { fontSize: 13, color: t.text3 },
   closeBtn: { marginLeft: "auto", background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 22, padding: 4 },

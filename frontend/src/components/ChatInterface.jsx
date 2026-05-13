@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import { t } from "../theme";
+import Icon from "./Icon";
 
 const MODE_LABELS = {
-  dreamer:  { th: "Career Dreamer", icon: "🌟", desc: "สำรวจอาชีพและความสนใจ" },
-  tcas_rag: { th: "TCAS Advisor",   icon: "🎓", desc: "ตรวจสอบสิทธิ์และเปรียบเทียบคณะ" },
+  dreamer:  { th: "Career Dreamer", iconName: "star",       desc: "สำรวจอาชีพและความสนใจ" },
+  tcas_rag: { th: "TCAS Advisor",   iconName: "graduation", desc: "ตรวจสอบสิทธิ์และเปรียบเทียบคณะ" },
 };
 
 function truncateName(text, max = 42) {
@@ -106,7 +107,7 @@ export default function ChatInterface({ getToken, sessions, setSessions, activeS
         }
       }
     } catch (e) {
-      setMessages((p) => [...p, { role: "assistant", content: `⚠️ เกิดข้อผิดพลาด: ${e.message}` }]);
+      setMessages((p) => [...p, { role: "assistant", content: `เกิดข้อผิดพลาด: ${e.message}` }]);
     } finally { setSending(false); }
   }
 
@@ -148,7 +149,7 @@ export default function ChatInterface({ getToken, sessions, setSessions, activeS
                 style={{ ...s.modeBtn, ...(currentMode === key ? s.modeBtnActive : {}), ...(mobile ? { flex: 1, textAlign: "center" } : {}) }}
                 onClick={() => activeSession ? switchMode(key) : setPendingMode(key)}
               >
-                {info.icon} {info.th}
+                <Icon name={info.iconName} size={14} /> {info.th}
               </button>
             ))}
           </div>
@@ -158,7 +159,7 @@ export default function ChatInterface({ getToken, sessions, setSessions, activeS
         <div style={{ ...s.messages, ...(mobile ? { padding: "12px 16px" } : {}) }}>
           {messages.length === 0 && (
             <div style={s.emptyState}>
-              <div style={s.emptyIcon}>{MODE_LABELS[currentMode]?.icon}</div>
+              <div style={s.emptyIcon}><Icon name={MODE_LABELS[currentMode]?.iconName} size={57} color={t.text3} /></div>
               <div style={s.emptyText}>เริ่มต้นการสนทนากับ {MODE_LABELS[currentMode]?.th}</div>
               <div style={s.emptySub}>{MODE_LABELS[currentMode]?.desc}</div>
             </div>
@@ -265,12 +266,12 @@ function RightPanel({ getToken }) {
         <div style={rp.label}>ลัด</div>
         <div style={rp.quickLinks}>
           {[
-            { emoji: "✅", text: "ตรวจสอบสิทธิ์" },
-            { emoji: "📌", text: "สาขาที่บันทึก" },
-            { emoji: "💼", text: "อาชีพแนะนำ" },
-          ].map(({ emoji, text }) => (
+            { iconName: "check-circle", text: "ตรวจสอบสิทธิ์" },
+            { iconName: "bookmark",     text: "สาขาที่บันทึก" },
+            { iconName: "briefcase",    text: "อาชีพแนะนำ" },
+          ].map(({ iconName, text }) => (
             <div key={text} style={rp.quickLink}>
-              <span>{emoji}</span>
+              <Icon name={iconName} size={16} />
               <span style={{ fontSize: 12, color: t.text2 }}>{text}</span>
             </div>
           ))}
@@ -281,10 +282,10 @@ function RightPanel({ getToken }) {
       <div style={rp.section}>
         <div style={rp.label}>เคล็ดลับ</div>
         <div style={rp.tipCard}>
-          <div style={rp.tipText}>ใช้ <strong>AI 1 (Career Dreamer)</strong> เพื่อสำรวจอาชีพที่เหมาะกับคุณ</div>
+          <div style={rp.tipText}>ใช้ <strong>Career Dreamer</strong> เพื่อสำรวจอาชีพที่เหมาะกับคุณ</div>
         </div>
         <div style={rp.tipCard}>
-          <div style={rp.tipText}>ใช้ <strong>AI 2 (TCAS Advisor)</strong> เพื่อเช็คสิทธิ์การสมัครจากข้อมูล SQL จริง</div>
+          <div style={rp.tipText}>ใช้ <strong>TCAS Advisor</strong> เพื่อเช็คสิทธิ์การสมัครจากข้อมูล SQL จริง</div>
         </div>
       </div>
     </div>
@@ -324,15 +325,15 @@ const s = {
 };
 
 const rp = {
-  panel:  { width: t.rightW, flexShrink: 0, background: t.surface, borderLeft: `1px solid ${t.border}`, padding: 14, overflowY: "auto" },
-  section: { marginBottom: 20 },
-  label:  { fontSize: 10, textTransform: "uppercase", letterSpacing: ".8px", color: t.text3, fontWeight: 600, marginBottom: 10 },
-  card:   { background: t.card, border: `1px solid ${t.border}`, borderRadius: 8, padding: 10 },
-  row:    { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "4px 0", borderBottom: `1px solid ${t.border}` },
-  key:    { fontSize: 11, color: t.text3 },
-  val:    { fontSize: 12, fontWeight: 600, color: t.text1 },
+  panel:  { width: t.rightW, flexShrink: 0, background: t.surface, borderLeft: `1px solid ${t.border}`, padding: 16, overflowY: "auto" },
+  section: { marginBottom: 22 },
+  label:  { fontSize: 13, textTransform: "uppercase", letterSpacing: ".8px", color: t.text3, fontWeight: 600, marginBottom: 12 },
+  card:   { background: t.card, border: `1px solid ${t.border}`, borderRadius: 8, padding: 12 },
+  row:    { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "5px 0", borderBottom: `1px solid ${t.border}` },
+  key:    { fontSize: 14, color: t.text3 },
+  val:    { fontSize: 15, fontWeight: 600, color: t.text1 },
   quickLinks: { display: "flex", flexDirection: "column", gap: 2 },
-  quickLink: { display: "flex", alignItems: "center", gap: 8, padding: "7px 10px", borderRadius: 8, cursor: "pointer", fontSize: 12 },
-  tipCard: { background: t.accentBg, border: `1px solid rgba(92,138,94,.2)`, borderRadius: 8, padding: "8px 10px", marginBottom: 6 },
-  tipText: { fontSize: 11, color: t.text2, lineHeight: 1.6 },
+  quickLink: { display: "flex", alignItems: "center", gap: 8, padding: "8px 10px", borderRadius: 8, cursor: "pointer", fontSize: 15 },
+  tipCard: { background: t.accentBg, border: `1px solid rgba(92,138,94,.2)`, borderRadius: 8, padding: "10px 12px", marginBottom: 6 },
+  tipText: { fontSize: 14, color: t.text2, lineHeight: 1.6 },
 };

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import Icon from "./Icon";
 import {
   ResponsiveContainer, LineChart, Line, BarChart, Bar,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ReferenceLine,
@@ -105,7 +106,7 @@ function ScoreChart({ data, hasOldData }) {
         </div>
       )}
       {hasOldData && (
-        <div style={s.note}>⚠ ซ่อนข้อมูลปี 2020–2022 (ระบบสอบเก่า PAT/O-NET) — ไม่สามารถเปรียบเทียบกับระบบ TGAT/TPAT ได้โดยตรง</div>
+        <div style={s.note}><Icon name="warning" size={13} color="#a07830" /> ซ่อนข้อมูลปี 2020–2022 (ระบบสอบเก่า PAT/O-NET) — ไม่สามารถเปรียบเทียบกับระบบ TGAT/TPAT ได้โดยตรง</div>
       )}
     </div>
   );

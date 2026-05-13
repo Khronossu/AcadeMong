@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import ConfirmDialog from "./ConfirmDialog";
+import Icon from "./Icon";
 
 export default function SavedMajorsView({ getToken }) {
   const [majors, setMajors] = useState(null);
@@ -83,7 +84,7 @@ export default function SavedMajorsView({ getToken }) {
 
       {majors.length === 0 ? (
         <div style={s.empty}>
-          <div style={s.emptyIcon}>📌</div>
+          <div style={s.emptyIcon}><Icon name="bookmark" size={40} color="#aaa" /></div>
           <p style={s.emptyText}>ยังไม่มีสาขาที่บันทึกไว้</p>
           <p style={s.hint}>ไปที่แท็บ "ตรวจสอบคุณสมบัติ" กดปุ่ม <strong>บันทึก</strong> บนโครงการที่สนใจ</p>
         </div>
