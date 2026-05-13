@@ -44,16 +44,27 @@ function AppContent({ getToken, username, signOut }) {
         ))}
       </nav>
 
-      <main style={tab === "chat" ? styles.mainFull : styles.main}>
-        <ErrorBoundary key={tab}>
-          {tab === "chat" && <ChatInterface getToken={getToken} />}
-          {tab === "profile" && (
-            <ProfileForm getToken={getToken} onSaved={() => setProfileSaved(true)} />
-          )}
-          {tab === "eligibility" && <EligibilityResults getToken={getToken} />}
-          {tab === "careers"     && <CareerPathView getToken={getToken} />}
+      {/* All tabs stay mounted — only visibility toggles. Prevents state loss and mid-flight fetch crashes. */}
+      <div style={{ ...styles.mainFull, display: tab === "chat" ? "block" : "none" }}>
+        <ErrorBoundary>
+          <ChatInterface getToken={getToken} />
         </ErrorBoundary>
-      </main>
+      </div>
+      <div style={{ ...styles.main, display: tab === "profile" ? "block" : "none" }}>
+        <ErrorBoundary>
+          <ProfileForm getToken={getToken} onSaved={() => setProfileSaved(true)} />
+        </ErrorBoundary>
+      </div>
+      <div style={{ ...styles.main, display: tab === "eligibility" ? "block" : "none" }}>
+        <ErrorBoundary>
+          <EligibilityResults getToken={getToken} />
+        </ErrorBoundary>
+      </div>
+      <div style={{ ...styles.main, display: tab === "careers" ? "block" : "none" }}>
+        <ErrorBoundary>
+          <CareerPathView getToken={getToken} />
+        </ErrorBoundary>
+      </div>
     </div>
   );
 }
