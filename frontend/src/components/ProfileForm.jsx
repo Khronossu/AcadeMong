@@ -291,12 +291,13 @@ export default function ProfileForm({ getToken, onSaved }) {
       ))}
       <button type="button" onClick={addScore} style={styles.addBtn}>+ เพิ่มวิชา</button>
 
-      {error && <p style={styles.error}>{error}</p>}
-      {success && <p style={styles.success}>บันทึกสำเร็จ ✓</p>}
-
-      <button type="submit" disabled={saving} style={styles.saveBtn}>
-        {saving ? "กำลังบันทึก..." : "บันทึกโปรไฟล์"}
-      </button>
+      <div style={styles.saveSection}>
+        {error && <p style={styles.error}>{error}</p>}
+        {success && <p style={styles.success}>บันทึกสำเร็จ ✓</p>}
+        <button type="submit" disabled={saving} style={styles.saveBtn}>
+          {saving ? "กำลังบันทึก..." : "บันทึกโปรไฟล์"}
+        </button>
+      </div>
     </form>
   );
 }
@@ -387,13 +388,16 @@ const styles = {
   scoreRow: { display: "flex", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap" },
   addBtn: {
     background: "none", border: `1px dashed ${t.borderMd}`, borderRadius: 8,
-    padding: "0.35rem 0.75rem", cursor: "pointer", marginBottom: "2.5rem",
+    padding: "0.35rem 0.75rem", cursor: "pointer", marginBottom: "0.5rem",
     color: t.text3, fontSize: 14,
   },
   removeBtn: { background: "none", border: "none", cursor: "pointer", color: t.fail, fontSize: "1rem", padding: "0 4px" },
+  saveSection: {
+    marginTop: 40, paddingTop: 20, borderTop: `1px solid ${t.border}`,
+  },
   saveBtn: {
     background: t.accent, color: "#fff", border: "none", borderRadius: 8,
-    padding: "10px 24px", cursor: "pointer", fontSize: 15, marginTop: "0.5rem", fontFamily: "inherit", fontWeight: 600,
+    padding: "10px 24px", cursor: "pointer", fontSize: 15, fontFamily: "inherit", fontWeight: 600,
   },
   error:   { color: t.fail, marginBottom: "0.5rem", fontSize: 13 },
   success: { color: t.pass, marginBottom: "0.5rem", fontSize: 13 },

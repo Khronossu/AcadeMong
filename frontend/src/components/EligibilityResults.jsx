@@ -110,42 +110,50 @@ export default function EligibilityResults({ getToken }) {
   }
 
   return (
-    <div style={cs.container}>
-      <div style={cs.topRow}>
-        <h2 style={cs.heading}>ตรวจสอบคุณสมบัติ TCAS รอบ 3</h2>
-        <button onClick={runCheck} disabled={loading} style={cs.checkBtn}>
-          {loading ? "กำลังตรวจสอบ..." : "ตรวจสอบใหม่"}
-        </button>
+    <div style={cs.outer}>
+      {/* Sticky controls — stay visible while results scroll */}
+      <div style={cs.stickyTop}>
+        <div style={cs.topRow}>
+          <h2 style={cs.heading}>ตรวจสอบคุณสมบัติ TCAS รอบ 3</h2>
+          <button onClick={runCheck} disabled={loading} style={cs.checkBtn}>
+            {loading ? "กำลังตรวจสอบ..." : "ตรวจสอบใหม่"}
+          </button>
+        </div>
+
+        {error && <p style={cs.error}>{error}</p>}
+
+        {results && (
+          <>
+            <div style={cs.summary}>
+              <span style={cs.badge}>ปีการศึกษา {results.year}</span>
+              <span style={{ ...cs.badge, background: "#0a7" }}>
+                ผ่านเกณฑ์ {eligibleTotal} / {total} โครงการ
+              </span>
+            </div>
+
+            <div style={cs.controls}>
+              <div style={cs.controlGroup}>
+                <span style={cs.controlLabel}>แสดง:</span>
+                {[["all", "ทั้งหมด"], ["eligible", "ผ่านเกณฑ์"], ["ineligible", "ไม่ผ่าน"]].map(([v, l]) => (
+                  <button key={v} onClick={() => setFilter(v)}
+                    style={{ ...cs.pill, ...(filter === v ? cs.pillActive : {}) }}>{l}</button>
+                ))}
+              </div>
+              <div style={cs.controlGroup}>
+                <span style={cs.controlLabel}>จัดกลุ่มตาม:</span>
+                {GROUP_OPTIONS.map(({ key, label }) => (
+                  <button key={key} onClick={() => setGroupKey(key)}
+                    style={{ ...cs.pill, ...(groupKey === key ? cs.pillActive : {}) }}>{label}</button>
+                ))}
+              </div>
+            </div>
+          </>
+        )}
       </div>
 
-      {error && <p style={cs.error}>{error}</p>}
-
+      {/* Scrollable results body — expands/collapses without touching the controls */}
       {results && (
-        <>
-          <div style={cs.summary}>
-            <span style={cs.badge}>ปีการศึกษา {results.year}</span>
-            <span style={{ ...cs.badge, background: "#0a7" }}>
-              ผ่านเกณฑ์ {eligibleTotal} / {total} โครงการ
-            </span>
-          </div>
-
-          <div style={cs.controls}>
-            <div style={cs.controlGroup}>
-              <span style={cs.controlLabel}>แสดง:</span>
-              {[["all", "ทั้งหมด"], ["eligible", "ผ่านเกณฑ์"], ["ineligible", "ไม่ผ่าน"]].map(([v, l]) => (
-                <button key={v} onClick={() => setFilter(v)}
-                  style={{ ...cs.pill, ...(filter === v ? cs.pillActive : {}) }}>{l}</button>
-              ))}
-            </div>
-            <div style={cs.controlGroup}>
-              <span style={cs.controlLabel}>จัดกลุ่มตาม:</span>
-              {GROUP_OPTIONS.map(({ key, label }) => (
-                <button key={key} onClick={() => setGroupKey(key)}
-                  style={{ ...cs.pill, ...(groupKey === key ? cs.pillActive : {}) }}>{label}</button>
-              ))}
-            </div>
-          </div>
-
+        <div style={cs.scrollBody}>
           {filtered.length === 0 ? (
             <p style={cs.empty}>ไม่มีโครงการในหมวดนี้</p>
           ) : (
@@ -159,7 +167,7 @@ export default function EligibilityResults({ getToken }) {
               />
             ))
           )}
-        </>
+        </div>
       )}
     </div>
   );
@@ -360,7 +368,13 @@ const eh = {
 };
 
 const cs = {
-  container: { maxWidth: 860, margin: "0 auto", padding: "24px 32px", fontFamily: "'Inter','Sarabun',sans-serif", fontSize: 14 },
+  outer: { maxWidth: 860, margin: "0 auto", width: "100%", fontFamily: "'Inter','Sarabun',sans-serif", fontSize: 14 },
+  stickyTop: {
+    position: "sticky", top: 0, zIndex: 10,
+    background: t.bg, padding: "24px 32px 16px",
+    borderBottom: `1px solid ${t.border}`,
+  },
+  scrollBody: { padding: "16px 32px 40px" },
   topRow: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12, flexWrap: "wrap" },
   heading: { color: t.text1, fontSize: 18, fontWeight: 700, margin: 0 },
   checkBtn: {
