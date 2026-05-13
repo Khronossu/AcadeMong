@@ -13,7 +13,7 @@ function truncateName(text, max = 42) {
   return clean.length <= max ? clean : clean.slice(0, max).trimEnd() + "…";
 }
 
-export default function ChatInterface({ getToken, sessions, setSessions, activeSession, setActiveSession }) {
+export default function ChatInterface({ getToken, sessions, setSessions, activeSession, setActiveSession, mobile }) {
   const [pendingMode, setPendingMode] = useState(null);
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
@@ -116,14 +116,14 @@ export default function ChatInterface({ getToken, sessions, setSessions, activeS
       <style>{`
         @keyframes bounce { 0%,80%,100%{transform:translateY(0)} 40%{transform:translateY(-5px)} }
         .msg-content p{margin:0 0 6px} .msg-content p:last-child{margin:0}
-        .msg-content table{border-collapse:collapse;width:100%;margin:8px 0;font-size:13px}
+        .msg-content table{border-collapse:collapse;width:100%;margin:8px 0;font-size:14px}
         .msg-content th,.msg-content td{border:1px solid ${t.border};padding:6px 10px;text-align:left}
         .msg-content th{background:${t.card};font-weight:600;color:${t.text2}}
         .msg-content ul,.msg-content ol{margin:4px 0;padding-left:20px}
         .msg-content li{margin-bottom:3px}
         .msg-content strong{color:${t.accentHov}}
-        .msg-content code{background:${t.card};border:1px solid ${t.border};padding:1px 5px;border-radius:4px;font-size:12.5px}
-        .msg-content pre{background:${t.text1};color:#f0ebe2;padding:12px;border-radius:8px;overflow-x:auto;font-size:12.5px}
+        .msg-content code{background:${t.card};border:1px solid ${t.border};padding:1px 6px;border-radius:4px;font-size:13.5px}
+        .msg-content pre{background:${t.text1};color:#f0ebe2;padding:14px;border-radius:8px;overflow-x:auto;font-size:13.5px}
         .msg-content hr{border:none;border-top:1px solid ${t.border};margin:10px 0}
         .msg-content em{color:${t.text2}}
       `}</style>
@@ -228,8 +228,8 @@ export default function ChatInterface({ getToken, sessions, setSessions, activeS
         )}
       </div>
 
-      {/* ── Right context panel ── */}
-      <RightPanel getToken={getToken} />
+      {/* ── Right context panel — hidden on mobile ── */}
+      {!mobile && <RightPanel getToken={getToken} />}
     </>
   );
 }
@@ -312,8 +312,8 @@ const s = {
 
   modeScreen: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 24, padding: 40 },
   modeHero: { textAlign: "center" },
-  modeTitle: { fontSize: 20, fontWeight: 700, color: t.text1, marginBottom: 6 },
-  modeSub:   { fontSize: 13, color: t.text3 },
+  modeTitle: { fontSize: 22, fontWeight: 700, color: t.text1, marginBottom: 6 },
+  modeSub:   { fontSize: 15, color: t.text3 },
   modeCards: { display: "flex", gap: 14 },
   modeCard:  {
     width: 200, padding: "24px 20px", background: t.surface,
@@ -322,34 +322,34 @@ const s = {
     display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
   },
   modeCardIcon: { fontSize: 32, marginBottom: 4 },
-  modeCardName: { fontSize: 14, fontWeight: 700, color: t.text1 },
-  modeCardDesc: { fontSize: 12, color: t.text3, lineHeight: 1.5 },
+  modeCardName: { fontSize: 16, fontWeight: 700, color: t.text1 },
+  modeCardDesc: { fontSize: 13, color: t.text3, lineHeight: 1.5 },
 
-  chatHeader: { padding: "10px 20px", borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", gap: 12, background: t.surface, flexShrink: 0 },
-  chatTitle:  { fontSize: 13, fontWeight: 600, color: t.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-  chatSub:    { fontSize: 11, color: t.text3, marginTop: 1 },
+  chatHeader: { padding: "12px 20px", borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", gap: 12, background: t.surface, flexShrink: 0 },
+  chatTitle:  { fontSize: 15, fontWeight: 700, color: t.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  chatSub:    { fontSize: 12, color: t.text3, marginTop: 2 },
   modeToggle: { display: "flex", background: t.card, borderRadius: 8, padding: 3, border: `1px solid ${t.border}`, flexShrink: 0 },
   modeBtn:    { padding: "4px 12px", borderRadius: 6, fontSize: 11, cursor: "pointer", border: "none", background: "transparent", color: t.text3, fontFamily: "inherit", whiteSpace: "nowrap", transition: "all .12s" },
   modeBtnActive: { background: t.surface, color: t.accent, fontWeight: 600, boxShadow: "0 1px 3px rgba(0,0,0,.08)" },
 
   messages: { flex: 1, overflowY: "auto", padding: "20px", display: "flex", flexDirection: "column", gap: 14 },
   emptyState: { margin: "auto", textAlign: "center", padding: 40 },
-  emptyIcon:  { fontSize: 36, marginBottom: 10 },
-  emptyText:  { fontSize: 14, fontWeight: 600, color: t.text2, marginBottom: 4 },
-  emptySub:   { fontSize: 12, color: t.text3 },
+  emptyIcon:  { fontSize: 44, marginBottom: 12 },
+  emptyText:  { fontSize: 17, fontWeight: 700, color: t.text2, marginBottom: 6 },
+  emptySub:   { fontSize: 14, color: t.text3 },
 
   msgRow:     { display: "flex", gap: 10, alignItems: "flex-start" },
   msgRowUser: { flexDirection: "row-reverse" },
   msgAvatar:  { width: 26, height: 26, borderRadius: 7, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, fontWeight: 700 },
   msgAvatarAI:   { background: t.accent, color: "#fff" },
   msgAvatarUser: { background: t.borderMd, color: t.text1 },
-  bubble:     { padding: "10px 14px", fontSize: 13.5, lineHeight: 1.65, borderRadius: 10, maxWidth: "78%" },
+  bubble:     { padding: "11px 15px", fontSize: 15.5, lineHeight: 1.7, borderRadius: 10, maxWidth: "78%" },
   bubbleAI:   { background: t.surface, border: `1px solid ${t.border}`, color: t.text1, borderRadius: "2px 10px 10px 10px" },
   bubbleUser: { background: t.accent, color: "#fff", borderRadius: "10px 2px 10px 10px" },
   dot:        { width: 7, height: 7, borderRadius: "50%", background: t.borderMd, display: "inline-block", animation: "bounce 1s infinite" },
 
   inputRow:  { padding: "12px 20px", borderTop: `1px solid ${t.border}`, background: t.surface, display: "flex", gap: 8, alignItems: "flex-end", flexShrink: 0 },
-  textarea:  { flex: 1, background: t.card, border: `1.5px solid ${t.border}`, borderRadius: 10, padding: "9px 13px", resize: "none", fontSize: 13.5, color: t.text1, outline: "none", fontFamily: "inherit", lineHeight: 1.5, transition: "border-color .15s" },
+  textarea:  { flex: 1, background: t.card, border: `1.5px solid ${t.border}`, borderRadius: 10, padding: "10px 14px", resize: "none", fontSize: 15.5, color: t.text1, outline: "none", fontFamily: "inherit", lineHeight: 1.5, transition: "border-color .15s" },
   sendBtn:   { width: 36, height: 36, background: t.accent, border: "none", borderRadius: 9, cursor: "pointer", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0, transition: "background .15s" },
   sendBtnDisabled: { background: t.borderMd, cursor: "default" },
 };
