@@ -4,7 +4,7 @@ import os
 OLLAMA_BASE_URL = f"http://{os.getenv('OLLAMA_HOST', 'ollama')}:{os.getenv('OLLAMA_PORT', 11434)}"
 
 async def chat(model, messages, temperature, top_p, max_tokens):
-    async with httpx.AsyncClient(timeout=60) as client:
+    async with httpx.AsyncClient(timeout=180) as client:
         response = await client.post(
             f'{OLLAMA_BASE_URL}/api/chat',
             json={
@@ -24,7 +24,7 @@ async def chat(model, messages, temperature, top_p, max_tokens):
 
 
 async def embed(model, text):
-    async with httpx.AsyncClient(timeout=60) as client:
+    async with httpx.AsyncClient(timeout=180) as client:
         response = await client.post(
             f'{OLLAMA_BASE_URL}/api/embed',
             json={
