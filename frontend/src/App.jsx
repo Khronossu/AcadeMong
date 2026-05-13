@@ -4,12 +4,14 @@ import ProfileForm from "./components/ProfileForm";
 import EligibilityResults from "./components/EligibilityResults";
 import ChatInterface from "./components/ChatInterface";
 import CareerPathView from "./components/CareerPathView";
+import SavedMajorsView from "./components/SavedMajorsView";
 import ErrorBoundary from "./components/ErrorBoundary";
 
 const TABS = [
   { key: "chat",        label: "แชทกับ AI" },
   { key: "profile",     label: "โปรไฟล์" },
   { key: "eligibility", label: "ตรวจสอบคุณสมบัติ" },
+  { key: "saved",       label: "สาขาที่บันทึก" },
   { key: "careers",     label: "อาชีพแนะนำ" },
 ];
 
@@ -58,6 +60,11 @@ function AppContent({ getToken, username, signOut }) {
       <div style={{ ...styles.main, display: tab === "eligibility" ? "block" : "none" }}>
         <ErrorBoundary>
           <EligibilityResults getToken={getToken} />
+        </ErrorBoundary>
+      </div>
+      <div style={{ ...styles.main, display: tab === "saved" ? "block" : "none" }}>
+        <ErrorBoundary>
+          <SavedMajorsView getToken={getToken} />
         </ErrorBoundary>
       </div>
       <div style={{ ...styles.main, display: tab === "careers" ? "block" : "none" }}>
