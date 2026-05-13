@@ -242,8 +242,8 @@ class TcasIngestion:
         for row in rows:
             program_id   = _str(row, "program_id")
             project_id   = _str(row, "project_id")
-            project_name = _str(row, "project_name_th") or ROUND_TYPE_THAI.get(round_type, round_type)
             round_type   = _str(row, "round_type")
+            project_name = _str(row, "project_name_th") or ROUND_TYPE_THAI.get(round_type, round_type)
             year         = _int(row, "year")
             seats        = _int(row, "receive_student_number")
             gpax_min     = _float(row, "min_gpax")
@@ -373,9 +373,9 @@ class TcasIngestion:
         now = datetime.now(timezone.utc)
 
         for row in rows:
-            program_id = _str(row, "program_id")
-            year       = _int(row, "tcas_year")
-            min_score  = _float(row, "min_score")
+            program_id  = _str(row, "program_id")
+            year        = _int(row, "year_ce")   # CE year already provided
+            min_score   = _float(row, "min_score")
             max_score  = _float(row, "max_score")
             applicants = _int(row, "applicants")
             accepted   = _int(row, "accepted")
@@ -384,10 +384,9 @@ class TcasIngestion:
             if not program_id or not year:
                 continue
 
-            # Find the first admission_project for this program+year
+            # Link to any admission_project for this program (historical data predates current cycle)
             ap_entries = [
-                ap_uuid for (y, ap_uuid) in self._program_ap_by_year.get(program_id, [])
-                if y == year
+                ap_uuid for (_, ap_uuid) in self._program_ap_by_year.get(program_id, [])
             ]
             if not ap_entries:
                 self.stats["historical_cutoffs_skipped"] += 1
@@ -415,7 +414,7 @@ class TcasIngestion:
                     self.stats["historical_cutoffs_skipped"] += 1
                     continue
                 await self._exec(
-                    "UPDATE historical_cutoffs SET effective_to = $1 WHERE id = $2",
+                    "UPDATE historical_cutoffs SET effective_to = $1, is_current = false WHERE id = $2",
                     now, current["id"],
                 )
                 self.stats["historical_cutoffs_closed"] += 1

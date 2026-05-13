@@ -192,9 +192,9 @@ CREATE TABLE IF NOT EXISTS historical_cutoffs (
     admission_project_id UUID REFERENCES admission_projects(id) ON DELETE CASCADE,
     year                INTEGER NOT NULL,        -- TCAS admission cycle year
     score_type          VARCHAR(50) NOT NULL,    -- Controlled vocab: DATA_CONTRACT §7.2
-    min_admitted_score  NUMERIC(8, 2),
-    max_admitted_score  NUMERIC(8, 2),
-    median_score        NUMERIC(8, 2),
+    min_admitted_score  NUMERIC(10, 2),
+    max_admitted_score  NUMERIC(10, 2),
+    median_score        NUMERIC(10, 2),
     applicants_count    INTEGER,
     accepted_count      INTEGER,
     source_url          TEXT NOT NULL,
