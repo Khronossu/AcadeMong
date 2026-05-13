@@ -218,6 +218,22 @@ CREATE INDEX IF NOT EXISTS idx_historical_cutoffs_project ON historical_cutoffs(
 CREATE INDEX IF NOT EXISTS idx_historical_cutoffs_current ON historical_cutoffs(admission_project_id, year, score_type) WHERE effective_to IS NULL;
 
 -- ==========================================
+-- 7. HUMAN REVIEW QUEUE (Phase 10.5)
+-- ==========================================
+
+CREATE TABLE IF NOT EXISTS flagged_outputs (
+    id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    message_id      UUID REFERENCES chat_messages(id) ON DELETE CASCADE,
+    flagged_by      UUID REFERENCES users(id) ON DELETE SET NULL,
+    reason          VARCHAR(100) NOT NULL, -- 'guardrail_trip' | 'user_report' | 'admin_review'
+    notes           TEXT,
+    reviewed        BOOLEAN DEFAULT FALSE,
+    created_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_flagged_outputs_reviewed ON flagged_outputs(reviewed, created_at DESC);
+
+-- ==========================================
 -- ALTER: admission_projects — round_type + round_metadata
 -- ==========================================
 
