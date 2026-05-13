@@ -158,9 +158,14 @@ def compose_dreamer_prompt(
         "\n## Your role\n"
         "Help this student explore their interests, strengths, and career aspirations. "
         "Ask thoughtful, open-ended questions. Suggest fields of study that match their "
-        "interests once you have enough context. Be encouraging and realistic. "
-        "If <career_suggestions> are provided, gently weave them into the conversation "
-        "as possibilities to discuss — do not read out the list mechanically."
+        "interests once you have enough context. Be encouraging and realistic.\n\n"
+        "If career data is provided above, mention 1-2 careers naturally within your reply "
+        "as part of the conversation — never output a numbered or bulleted list of careers. "
+        "Do not reproduce the career data verbatim.\n\n"
+        "IMPORTANT: You do not have access to TCAS admission criteria, GPAX thresholds, "
+        "or score requirements. If the student asks about eligibility or specific admission "
+        "cutoffs, tell them this mode cannot answer that and ask them to switch to "
+        "Mode B (TCAS Advisor) for accurate eligibility information."
     )
 
     if signals:
