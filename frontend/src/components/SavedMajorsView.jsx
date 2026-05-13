@@ -1,9 +1,11 @@
 import { useState, useEffect } from "react";
+import ConfirmDialog from "./ConfirmDialog";
 
 export default function SavedMajorsView({ getToken }) {
   const [majors, setMajors] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [confirmDelete, setConfirmDelete] = useState(null); // majorId to delete
 
   useEffect(() => {
     const controller = new AbortController();
@@ -28,7 +30,6 @@ export default function SavedMajorsView({ getToken }) {
   }, []);
 
   async function handleDelete(majorId) {
-    if (!confirm("ลบสาขานี้ออกจากรายการบันทึก?")) return;
     try {
       const token = await getToken();
       const res = await fetch(`/api/profile/saved-majors/${majorId}`, {
@@ -65,6 +66,15 @@ export default function SavedMajorsView({ getToken }) {
 
   return (
     <div style={s.container}>
+      {confirmDelete && (
+        <ConfirmDialog
+          message="ลบสาขานี้ออกจากรายการบันทึก?"
+          confirmLabel="ลบ"
+          onConfirm={() => { handleDelete(confirmDelete); setConfirmDelete(null); }}
+          onCancel={() => setConfirmDelete(null)}
+        />
+      )}
+
       <div style={s.headerRow}>
         <h2 style={s.heading}>สาขาที่บันทึกไว้</h2>
         <span style={s.count}>{majors.length} สาขา</span>
@@ -83,7 +93,7 @@ export default function SavedMajorsView({ getToken }) {
             key={univ}
             university={univ}
             majors={grouped[univ]}
-            onDelete={handleDelete}
+            onDelete={(id) => setConfirmDelete(id)}
             onSaveNote={handleSaveNote}
           />
         ))
