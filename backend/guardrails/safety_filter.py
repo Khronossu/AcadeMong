@@ -26,6 +26,8 @@ import os
 
 import httpx
 
+from middleware.metrics import guardrail_safety_blocked
+
 logger = logging.getLogger(__name__)
 
 SAFETY_MODEL = os.getenv("SAFETY_MODEL", "llama-guard3:1b")
@@ -124,4 +126,5 @@ async def check_safety(user_message: str, agent_response: str) -> tuple[bool, st
         return True, agent_response, categories
 
     logger.warning("Llama Guard blocked response — categories: %s", watched)
+    guardrail_safety_blocked(watched)
     return False, _SAFE_REFUSAL, watched

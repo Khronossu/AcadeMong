@@ -550,14 +550,28 @@ Runs every AI response through **Llama Guard 3 (1B)** before returning to the us
 
 Failure mode: **fail open** — if Llama Guard is unreachable, the response is passed through with a warning log. A cold-start adds ~3s (model loads on demand).
 
-### Layer 7 — Observability (`guardrails/rate_limiter.py` + admin router)
+### Layer 7 — Observability (`middleware/metrics.py` + `rate_limiter.py` + admin router)
 
-- Structured request logging: `{user_id, mode, guardrail_flags, latency_ms}` (PII-redacted)
-- Per-user rate limits: 60 chat requests/hr, 10 ingestion requests/hr
-- Daily quota counter per user (analytics, no hard cap)
-- Human review queue: flagged outputs stored in `flagged_outputs` table
-- Admin endpoint `GET /api/admin/flagged` for weekly review
-- Admin endpoint `GET /api/admin/usage/{user_id}` for rate limit audit
+**Structured request logging** (`middleware/logging.py`): every HTTP request logged as JSON — `{timestamp, method, path, status_code, latency_ms, user_id}` — PII-redacted (Thai national ID, phone, email, landline, +66 format) via `guardrails/pii_redactor.py`.
+
+**Application metric events** (`middleware/metrics.py`): each event emitted as a JSON log line to the `academong.metrics` logger, consumable by CloudWatch Logs Metric Filters or Grafana Loki:
+
+| Metric | Emitted when |
+|---|---|
+| `llm.latency_ms` | Every Ollama `chat()` call — tagged with model + mode |
+| `rag.retrieval_miss` | `retrieve_context()` returns empty list |
+| `guardrail.injection_blocked` | `detect_injection()` fires |
+| `guardrail.topic_blocked` | `validate_topic()` hard-blocks |
+| `guardrail.numeric_stripped` | Numeric validator strips ≥1 claim |
+| `guardrail.safety_blocked` | Llama Guard blocks a response |
+| `guardrail.citation_missing` | RAG used but no inline `[ที่มา:]` found |
+| `rate_limit.exceeded` | User exceeds chat or ingest hourly cap |
+
+**Rate limiting**: 60 chat requests/hr, 10 ingestion requests/hr per user (Redis sliding window, 3600s TTL). Daily quota counter for analytics.
+
+**Human review queue**: uncited RAG responses and admin-flagged messages stored in `flagged_outputs` (PostgreSQL). Admin endpoints: `GET /api/admin/flagged`, `POST /api/admin/flag/{message_id}`, `PATCH /api/admin/flagged/{id}/reviewed`, `GET /api/admin/usage/{user_id}`.
+
+**Production alarms** (Phase 12 — CloudWatch): error rate > 2%, guardrail trip spike, retrieval-miss rate climbing, LLM p95 latency > threshold. These require the CloudWatch Metric Filters to be configured against the `academong.metrics` log stream.
 
 ---
 
@@ -1004,7 +1018,7 @@ CI/CD: GitHub Actions → ECR push → ECS deploy (staging → prod with approva
 |---|---|---|
 | 1 | Infrastructure (Docker, /health) | ✅ Complete |
 | 2 | Model config + Ollama client | ✅ Complete |
-| 2.5 | Fallback model evaluation | ⏳ Pending |
+| 2.5 | Fallback model evaluation | ✅ Eval harness ready (`scripts/eval_fallback.py`); run to pick winner |
 | 3 | PostgreSQL schema + migrations | ✅ Complete |
 | 4 | Firebase auth + session | ✅ Complete |
 | 5 | TCAS CSV ingestion + eligibility engine | ✅ Complete |
@@ -1012,9 +1026,9 @@ CI/CD: GitHub Actions → ECR push → ECS deploy (staging → prod with approva
 | 7 | Career data + career_catalog + matcher | ✅ Complete |
 | 8 | Orchestrator + mode selector + memory | ✅ Complete |
 | 9 | Prompting system + tone adaptation | ✅ Complete |
-| 9.5 | Guardrails (input gate, numeric validator, safety filter) | ✅ Complete (citation enforcement pending) |
+| 9.5 | Guardrails (input gate, numeric validator, safety filter, citation enforcement) | ✅ Complete |
 | 10 | Frontend (all tabs, responsive, icon system) | ✅ Complete |
-| 10.5 | Observability + rate limiting | ✅ Rate limiting complete; PII redaction in logs pending |
+| 10.5 | Observability + rate limiting | ✅ Complete |
 | 11 | End-to-end golden set testing | ⏳ Pending |
 | 12 | Production deploy (AWS + RunPod) | ⏳ Pending |
 | 13 | Feedback loop + eval automation | ⏳ Pending |

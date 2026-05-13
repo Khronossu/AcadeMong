@@ -23,6 +23,7 @@ import unicodedata
 from fastapi import HTTPException
 
 from guardrails.pii_redactor import redact_truncate as _redact_log
+from middleware.metrics import guardrail_injection_blocked, guardrail_topic_blocked
 
 logger = logging.getLogger(__name__)
 
@@ -73,7 +74,10 @@ def detect_injection(message: str) -> bool:
     Call this before dispatching to the orchestrator. If True, return HTTP 400.
     """
     normalized = _normalize(message)
-    return any(p.search(normalized) for p in _INJECTION_PATTERNS)
+    hit = any(p.search(normalized) for p in _INJECTION_PATTERNS)
+    if hit:
+        guardrail_injection_blocked()
+    return hit
 
 
 # ---------------------------------------------------------------------------
@@ -139,6 +143,7 @@ def validate_topic(message: str) -> None:
 
     # Hard block — clearly nothing to do with education
     if any(p.search(normalized) for p in _HARD_OFFTOPIC_PATTERNS):
+        guardrail_topic_blocked()
         raise HTTPException(
             status_code=400,
             detail="ขออภัย ระบบนี้ช่วยได้เฉพาะเรื่อง TCAS การเลือกคณะ และการวางแผนอาชีพเท่านั้น",

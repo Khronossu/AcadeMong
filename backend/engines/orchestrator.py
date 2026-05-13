@@ -23,6 +23,11 @@ from engines.rag_engine import retrieve_context
 from guardrails.numeric_validator import validate_numeric_claims
 from guardrails.safety_filter import check_safety
 from db.postgres import execute as _db_execute
+from middleware.metrics import (
+    guardrail_numeric_stripped,
+    guardrail_citation_missing,
+    rag_retrieval_miss,
+)
 from memory.long_term_memory import save_message
 from memory.session_memory import (
     append_to_chat_window,
@@ -93,7 +98,7 @@ async def handle_dreamer_message(
     system_prompt = compose_dreamer_prompt(profile, career_suggestions, signals=signals, user_role=user_role)
     cfg = get_model_config("dreamer_chat")
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": content}]
-    response = await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
+    response = await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"], mode="dreamer_chat")
     response = _strip_internal_tags(response)
     _safe, response, _ = await check_safety(content, response)
     return response
@@ -153,6 +158,8 @@ async def handle_tcas_message(
     signals = await _update_signals(str(user_id), str(session_id), content)
     eligibility = await check_eligibility(user_id=user_id)
     rag_context = await retrieve_context(content)
+    if not rag_context:
+        rag_retrieval_miss(content[:60])
     user_role = profile.get("role", "student")
     system_prompt = compose_tcas_prompt(
         profile, eligibility, rag_context,
@@ -160,12 +167,13 @@ async def handle_tcas_message(
     )
     cfg = get_model_config("tcas_chat")
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": content}]
-    response = await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
+    response = await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"], mode="tcas_chat")
 
     _valid, response, flags = validate_numeric_claims(response, eligibility, rag_context)
     if flags:
         import logging
         logging.getLogger(__name__).warning("Numeric claims stripped: %s", flags)
+        guardrail_numeric_stripped(len(flags), session_id=str(session_id))
 
     response = _strip_internal_tags(response)
     response, citation_ok = await _enforce_citations(response, rag_context, session_id)
@@ -174,6 +182,7 @@ async def handle_tcas_message(
         _log.getLogger(__name__).warning(
             "RAG response missing inline citations — session %s; footer appended", session_id
         )
+        guardrail_citation_missing(session_id=str(session_id))
 
     _safe, response, _ = await check_safety(content, response)
     return response

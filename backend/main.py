@@ -37,6 +37,7 @@ logging.config.dictConfig({
     },
     "loggers": {
         "academong.requests": {"handlers": ["request_console"], "level": "INFO", "propagate": False},
+        "academong.metrics":  {"handlers": ["request_console"], "level": "INFO", "propagate": False},
         "uvicorn": {"handlers": ["console"], "level": "WARNING"},
     },
     "root": {"handlers": ["console"], "level": "INFO"},

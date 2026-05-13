@@ -16,6 +16,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 import memory.session_memory as _session_memory
+from middleware.metrics import rate_limit_exceeded as _metric_rate_limit
 
 
 def _redis():
@@ -52,6 +53,7 @@ async def check_chat_rate(user_id: str | UUID) -> None:
     await r.expire(day_key, 86400)
 
     if count > CHAT_LIMIT_PER_HOUR:
+        _metric_rate_limit(uid, "chat")
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"เกินขีดจำกัด {CHAT_LIMIT_PER_HOUR} ข้อความต่อชั่วโมง กรุณารอแล้วลองใหม่",
@@ -69,6 +71,7 @@ async def check_ingest_rate(user_id: str | UUID) -> None:
         await r.expire(key, 3600)
 
     if count > INGEST_LIMIT_PER_HOUR:
+        _metric_rate_limit(uid, "ingest")
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail=f"เกินขีดจำกัด {INGEST_LIMIT_PER_HOUR} คำขอต่อชั่วโมง",
