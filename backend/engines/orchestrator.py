@@ -21,6 +21,7 @@ from engines.eligibility_engine import check_eligibility
 from engines.prompt_composer import compose_dreamer_prompt, compose_tcas_prompt
 from engines.rag_engine import retrieve_context
 from guardrails.numeric_validator import validate_numeric_claims
+from guardrails.safety_filter import check_safety
 from memory.long_term_memory import save_message
 from memory.session_memory import (
     append_to_chat_window,
@@ -92,7 +93,9 @@ async def handle_dreamer_message(
     cfg = get_model_config("dreamer_chat")
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": content}]
     response = await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
-    return _strip_internal_tags(response)
+    response = _strip_internal_tags(response)
+    _safe, response, _ = await check_safety(content, response)
+    return response
 
 
 async def handle_tcas_message(
@@ -120,7 +123,9 @@ async def handle_tcas_message(
         import logging
         logging.getLogger(__name__).warning("Numeric claims stripped: %s", flags)
 
-    return _strip_internal_tags(response)
+    response = _strip_internal_tags(response)
+    _safe, response, _ = await check_safety(content, response)
+    return response
 
 
 async def handle_message(
