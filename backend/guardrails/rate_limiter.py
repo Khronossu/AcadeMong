@@ -14,7 +14,12 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from memory.session_memory import redis_pool
+import memory.session_memory as _session_memory
+
+
+def _redis():
+    """Access pool lazily so we always get the initialized instance."""
+    return _session_memory.redis_pool
 
 CHAT_LIMIT_PER_HOUR = 60
 INGEST_LIMIT_PER_HOUR = 10
@@ -33,15 +38,15 @@ def _day_key(user_id: str) -> str:
 
 async def check_chat_rate(user_id: str | UUID) -> None:
     """Raise HTTP 429 if user exceeds 60 chat messages/hr."""
+    r = _redis()
     uid = str(user_id)
     key = _hour_key("chat", uid)
-    count = await redis_pool.incr(key)
+    count = await r.incr(key)
     if count == 1:
-        await redis_pool.expire(key, 3600)
-    # Increment daily quota counter (no hard cap — analytics)
+        await r.expire(key, 3600)
     day_key = _day_key(uid)
-    await redis_pool.incr(day_key)
-    await redis_pool.expire(day_key, 86400)
+    await r.incr(day_key)
+    await r.expire(day_key, 86400)
 
     if count > CHAT_LIMIT_PER_HOUR:
         raise HTTPException(
@@ -53,11 +58,12 @@ async def check_chat_rate(user_id: str | UUID) -> None:
 
 async def check_ingest_rate(user_id: str | UUID) -> None:
     """Raise HTTP 429 if user exceeds 10 ingestion requests/hr."""
+    r = _redis()
     uid = str(user_id)
     key = _hour_key("ingest", uid)
-    count = await redis_pool.incr(key)
+    count = await r.incr(key)
     if count == 1:
-        await redis_pool.expire(key, 3600)
+        await r.expire(key, 3600)
 
     if count > INGEST_LIMIT_PER_HOUR:
         raise HTTPException(
@@ -69,14 +75,11 @@ async def check_ingest_rate(user_id: str | UUID) -> None:
 
 async def get_usage(user_id: str | UUID) -> dict:
     """Return current hour + today usage counts for a user (admin/debug use)."""
+    r = _redis()
     uid = str(user_id)
-    chat_key = _hour_key("chat", uid)
-    ingest_key = _hour_key("ingest", uid)
-    day_key = _day_key(uid)
-
-    chat_hr = await redis_pool.get(chat_key)
-    ingest_hr = await redis_pool.get(ingest_key)
-    day_total = await redis_pool.get(day_key)
+    chat_hr = await r.get(_hour_key("chat", uid))
+    ingest_hr = await r.get(_hour_key("ingest", uid))
+    day_total = await r.get(_day_key(uid))
 
     return {
         "chat_this_hour": int(chat_hr or 0),
