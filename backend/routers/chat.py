@@ -84,6 +84,7 @@ class EligibilityResult(BaseModel):
     major_id: Optional[str] = None
     project_name: str
     major: str
+    field: Optional[str] = None
     faculty: str
     university: str
     round_number: int

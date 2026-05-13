@@ -1,10 +1,28 @@
 import { useState } from "react";
 
+const GROUP_OPTIONS = [
+  { key: "university", label: "มหาวิทยาลัย" },
+  { key: "faculty",    label: "คณะ" },
+  { key: "field",      label: "สาขาวิชา" },
+  { key: "none",       label: "ทั้งหมด" },
+];
+
+function groupBy(items, key) {
+  const map = {};
+  for (const item of items) {
+    const k = (key === "none" ? "ทั้งหมด" : item[key]) || "ไม่ระบุ";
+    if (!map[k]) map[k] = [];
+    map[k].push(item);
+  }
+  return Object.entries(map).sort(([a], [b]) => a.localeCompare(b, "th"));
+}
+
 export default function EligibilityResults({ getToken }) {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [filter, setFilter] = useState("all"); // "all" | "eligible" | "ineligible"
+  const [filter, setFilter] = useState("eligible");
+  const [groupKey, setGroupKey] = useState("university");
 
   async function runCheck() {
     setLoading(true);
@@ -28,87 +46,106 @@ export default function EligibilityResults({ getToken }) {
     }
   }
 
-  const shown = results?.results?.filter((r) => {
+  const filtered = results?.results?.filter((r) => {
     if (filter === "eligible") return r.eligible;
     if (filter === "ineligible") return !r.eligible;
     return true;
   }) ?? [];
 
+  const groups = groupBy(filtered, groupKey);
+  const eligibleTotal = results?.eligible_count ?? 0;
+  const total = results?.total_projects ?? 0;
+
   return (
-    <div style={containerStyles.container}>
-      <h2 style={containerStyles.heading}>ตรวจสอบคุณสมบัติ TCAS รอบ 3</h2>
-      <p style={containerStyles.hint}>
+    <div style={cs.container}>
+      <h2 style={cs.heading}>ตรวจสอบคุณสมบัติ TCAS รอบ 3</h2>
+      <p style={cs.hint}>
         กดปุ่มด้านล่างเพื่อดูโครงการรับสมัครทั้งหมดที่คุณมีสิทธิ์สมัคร<br />
         (บันทึก GPAX และคะแนนสอบในแท็บ "โปรไฟล์" ก่อน)
       </p>
 
-      <button
-        onClick={runCheck}
-        disabled={loading}
-        style={containerStyles.checkBtn}
-      >
+      <button onClick={runCheck} disabled={loading} style={cs.checkBtn}>
         {loading ? "กำลังตรวจสอบ..." : "ตรวจสอบคุณสมบัติ"}
       </button>
 
-      {error && <p style={containerStyles.error}>{error}</p>}
+      {error && <p style={cs.error}>{error}</p>}
 
       {results && (
         <>
-          <div style={containerStyles.summary}>
-            <span style={containerStyles.badge}>ปีการศึกษา {results.year}</span>
-            <span style={{ ...containerStyles.badge, background: "#0a7" }}>
-              ผ่านเกณฑ์ {results.eligible_count} / {results.total_projects} โครงการ
+          <div style={cs.summary}>
+            <span style={cs.badge}>ปีการศึกษา {results.year}</span>
+            <span style={{ ...cs.badge, background: "#0a7" }}>
+              ผ่านเกณฑ์ {eligibleTotal} / {total} โครงการ
             </span>
           </div>
 
-          <div style={containerStyles.filterRow}>
-            {["all", "eligible", "ineligible"].map((f) => (
-              <button
-                key={f}
-                onClick={() => setFilter(f)}
-                style={{ ...containerStyles.filterBtn, ...(filter === f ? containerStyles.filterActive : {}) }}
-              >
-                {f === "all" ? "ทั้งหมด" : f === "eligible" ? "ผ่านเกณฑ์" : "ไม่ผ่านเกณฑ์"}
-              </button>
-            ))}
+          {/* Filter + Group controls */}
+          <div style={cs.controls}>
+            <div style={cs.controlGroup}>
+              <span style={cs.controlLabel}>แสดง:</span>
+              {[["all", "ทั้งหมด"], ["eligible", "ผ่านเกณฑ์"], ["ineligible", "ไม่ผ่าน"]].map(([v, l]) => (
+                <button key={v} onClick={() => setFilter(v)}
+                  style={{ ...cs.pill, ...(filter === v ? cs.pillActive : {}) }}>
+                  {l}
+                </button>
+              ))}
+            </div>
+            <div style={cs.controlGroup}>
+              <span style={cs.controlLabel}>จัดกลุ่มตาม:</span>
+              {GROUP_OPTIONS.map(({ key, label }) => (
+                <button key={key} onClick={() => setGroupKey(key)}
+                  style={{ ...cs.pill, ...(groupKey === key ? cs.pillActive : {}) }}>
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
-          <div>
-            {shown.map((r) => (
-              <ProjectCard key={r.admission_project_id} result={r} getToken={getToken} />
-            ))}
-            {shown.length === 0 && (
-              <p style={containerStyles.empty}>ไม่มีโครงการในหมวดนี้</p>
-            )}
-          </div>
+          {/* Grouped results */}
+          {filtered.length === 0 ? (
+            <p style={cs.empty}>ไม่มีโครงการในหมวดนี้</p>
+          ) : (
+            groups.map(([groupName, items]) => (
+              <GroupSection
+                key={groupName}
+                name={groupName}
+                items={items}
+                getToken={getToken}
+                defaultOpen={groups.length <= 3}
+              />
+            ))
+          )}
         </>
       )}
     </div>
   );
 }
 
-const containerStyles = {
-  container: { maxWidth: 800, margin: "0 auto", padding: "1rem" },
-  heading: { color: "#1a1a2e" },
-  hint: { color: "#555", marginBottom: "1rem", lineHeight: 1.6 },
-  checkBtn: {
-    background: "#0f3460", color: "#fff", border: "none", borderRadius: 8,
-    padding: "0.6rem 1.5rem", cursor: "pointer", fontSize: "1rem", marginBottom: "1rem",
-  },
-  error: { color: "#c00" },
-  summary: { display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" },
-  badge: {
-    background: "#0f3460", color: "#fff", borderRadius: 20,
-    padding: "0.25rem 0.75rem", fontSize: "0.85rem",
-  },
-  filterRow: { display: "flex", gap: "0.5rem", marginBottom: "1rem" },
-  filterBtn: {
-    border: "1px solid #ccc", borderRadius: 20, padding: "0.25rem 0.75rem",
-    cursor: "pointer", background: "#fff", fontSize: "0.85rem",
-  },
-  filterActive: { background: "#0f3460", color: "#fff", border: "1px solid #0f3460" },
-  empty: { color: "#888", textAlign: "center", padding: "2rem" },
-};
+function GroupSection({ name, items, getToken, defaultOpen }) {
+  const [open, setOpen] = useState(defaultOpen);
+  const eligibleCount = items.filter((r) => r.eligible).length;
+
+  return (
+    <div style={gs.section}>
+      <div style={gs.header} onClick={() => setOpen(!open)}>
+        <div style={gs.headerLeft}>
+          <span style={gs.groupName}>{name}</span>
+          <span style={{ ...gs.count, color: eligibleCount > 0 ? "#0a7" : "#c33" }}>
+            ผ่านเกณฑ์ {eligibleCount}/{items.length}
+          </span>
+        </div>
+        <span style={gs.toggle}>{open ? "▲" : "▼"}</span>
+      </div>
+      {open && (
+        <div style={gs.body}>
+          {items.map((r) => (
+            <ProjectCard key={r.admission_project_id} result={r} getToken={getToken} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function ProjectCard({ result, getToken }) {
   const [open, setOpen] = useState(false);
@@ -134,28 +171,30 @@ export function ProjectCard({ result, getToken }) {
   return (
     <div style={{ ...styles.card, borderLeft: `4px solid ${borderColor}` }}>
       <div style={styles.cardHeader} onClick={() => setOpen(!open)}>
-        <div>
-          <span style={{ ...styles.eligibleBadge, background: borderColor }}>
-            {result.eligible ? "ผ่านเกณฑ์" : "ไม่ผ่านเกณฑ์"}
-          </span>
-          <strong style={styles.projectName}>{result.project_name}</strong>
+        <div style={{ flex: 1 }}>
+          <div style={styles.topRow}>
+            <span style={{ ...styles.eligibleBadge, background: borderColor }}>
+              {result.eligible ? "ผ่านเกณฑ์" : "ไม่ผ่านเกณฑ์"}
+            </span>
+            <strong style={styles.projectName}>{result.project_name}</strong>
+          </div>
           <div style={styles.location}>
             {result.university} › {result.faculty} › {result.major}
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
           {result.major_id && getToken && (
             <button
               onClick={handleSave}
               disabled={saving || saved}
               style={{
                 padding: "4px 10px", border: "1.5px solid", borderRadius: 20, fontSize: "0.78rem",
-                cursor: saved ? "default" : "pointer", fontWeight: 600,
+                cursor: saved ? "default" : "pointer", fontWeight: 600, whiteSpace: "nowrap",
                 borderColor: saved ? "#0a7" : "#0f3460",
                 color: saved ? "#0a7" : "#0f3460", background: "#fff",
               }}
             >
-              {saved ? "✓ บันทึกแล้ว" : saving ? "..." : "บันทึก"}
+              {saved ? "✓ บันทึก" : saving ? "..." : "บันทึก"}
             </button>
           )}
           <span style={styles.toggle}>{open ? "▲" : "▼"}</span>
@@ -199,9 +238,7 @@ export function ProjectCard({ result, getToken }) {
                       <td style={styles.td}>{s.student_score ?? "ไม่มีข้อมูล"}</td>
                       <td style={styles.td}>{s.weight_percent != null ? `${s.weight_percent}%` : "–"}</td>
                       <td style={styles.td}>
-                        <span style={s.ok ? styles.pass : styles.fail}>
-                          {s.ok ? "✓" : "✗"}
-                        </span>
+                        <span style={s.ok ? styles.pass : styles.fail}>{s.ok ? "✓" : "✗"}</span>
                       </td>
                     </tr>
                   ))}
@@ -221,23 +258,54 @@ export function ProjectCard({ result, getToken }) {
   );
 }
 
-const styles = {
-  card: {
-    border: "1px solid #e0e0e0", borderRadius: 8, marginBottom: "0.75rem",
-    overflow: "hidden",
+const cs = {
+  container: { maxWidth: 860, margin: "0 auto", padding: "1rem" },
+  heading: { color: "#1a1a2e" },
+  hint: { color: "#555", marginBottom: "1rem", lineHeight: 1.6 },
+  checkBtn: {
+    background: "#0f3460", color: "#fff", border: "none", borderRadius: 8,
+    padding: "0.6rem 1.5rem", cursor: "pointer", fontSize: "1rem", marginBottom: "1rem",
   },
+  error: { color: "#c00" },
+  summary: { display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" },
+  badge: { background: "#0f3460", color: "#fff", borderRadius: 20, padding: "0.25rem 0.75rem", fontSize: "0.85rem" },
+  controls: { display: "flex", flexDirection: "column", gap: 8, marginBottom: "1.25rem" },
+  controlGroup: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" },
+  controlLabel: { fontSize: "0.82rem", color: "#666", minWidth: 90 },
+  pill: {
+    border: "1px solid #ccc", borderRadius: 20, padding: "0.2rem 0.7rem",
+    cursor: "pointer", background: "#fff", fontSize: "0.82rem", color: "#555",
+  },
+  pillActive: { background: "#0f3460", color: "#fff", border: "1px solid #0f3460" },
+  empty: { color: "#888", textAlign: "center", padding: "2rem" },
+};
+
+const gs = {
+  section: { marginBottom: "0.75rem", border: "1px solid #dde", borderRadius: 10, overflow: "hidden" },
+  header: {
+    display: "flex", justifyContent: "space-between", alignItems: "center",
+    padding: "0.75rem 1rem", cursor: "pointer",
+    background: "#f0f4ff", userSelect: "none",
+  },
+  headerLeft: { display: "flex", alignItems: "center", gap: 10 },
+  groupName: { fontWeight: 700, color: "#1a1a2e", fontSize: "0.95rem" },
+  count: { fontSize: "0.82rem", fontWeight: 600 },
+  toggle: { color: "#888", fontSize: "0.9rem" },
+  body: { padding: "0.5rem 0.75rem" },
+};
+
+const styles = {
+  card: { border: "1px solid #e8e8e8", borderRadius: 8, marginBottom: "0.5rem", overflow: "hidden", background: "#fff" },
   cardHeader: {
     display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-    padding: "0.75rem 1rem", cursor: "pointer", background: "#fafafa",
+    padding: "0.65rem 0.9rem", cursor: "pointer", background: "#fafafa", gap: 8,
   },
-  cardBody: { padding: "0.75rem 1rem", borderTop: "1px solid #eee" },
-  projectName: { display: "block", fontSize: "1rem", margin: "0.25rem 0" },
-  location: { color: "#666", fontSize: "0.85rem" },
-  eligibleBadge: {
-    color: "#fff", borderRadius: 12, padding: "0.1rem 0.5rem",
-    fontSize: "0.75rem", marginRight: "0.5rem",
-  },
-  toggle: { color: "#888", paddingTop: "0.25rem" },
+  topRow: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 2 },
+  cardBody: { padding: "0.75rem 0.9rem", borderTop: "1px solid #eee" },
+  projectName: { fontSize: "0.95rem" },
+  location: { color: "#666", fontSize: "0.82rem" },
+  eligibleBadge: { color: "#fff", borderRadius: 12, padding: "0.1rem 0.5rem", fontSize: "0.72rem", whiteSpace: "nowrap" },
+  toggle: { color: "#888" },
   row: { display: "flex", gap: "1rem", marginBottom: "0.4rem", fontSize: "0.9rem" },
   key: { color: "#555", minWidth: 120 },
   subHeading: { fontWeight: 600, margin: "0.75rem 0 0.35rem", fontSize: "0.9rem" },

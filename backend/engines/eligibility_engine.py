@@ -64,6 +64,7 @@ async def _fetch_projects_with_requirements(
                 tr.year,
                 m.id              AS major_id,
                 m.name            AS major_name,
+                m.field           AS major_field,
                 f.name            AS faculty_name,
                 u.name            AS university_name
             FROM admission_projects ap
@@ -129,8 +130,10 @@ def _evaluate(proj: dict, student_gpax: Optional[float], student_scores: dict[st
 
     return {
         "admission_project_id": str(proj["ap_id"]),
+        "major_id": str(proj["major_id"]),
         "project_name": proj["project_name"],
         "major": proj["major_name"],
+        "field": proj["major_field"],
         "faculty": proj["faculty_name"],
         "university": proj["university_name"],
         "round_number": proj["round_number"],
