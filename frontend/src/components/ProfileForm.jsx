@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { t } from "../theme";
 
 const SUBJECTS = [
   "TGAT1", "TGAT2", "TGAT3", "TGAT",
@@ -223,37 +224,38 @@ export default function ProfileForm({ getToken, onSaved }) {
 }
 
 const styles = {
-  form: { maxWidth: 640, margin: "0 auto", padding: "1rem" },
-  heading: { color: "#1a1a2e", marginBottom: "1rem" },
-  subheading: { color: "#16213e", margin: "1.2rem 0 0.4rem" },
-  hint: { color: "#888", fontSize: "0.85rem", margin: "0 0 0.6rem" },
-  label: { display: "block", marginBottom: "0.25rem", fontWeight: 600, fontSize: "0.9rem" },
+  form: { maxWidth: 640, margin: "0 auto", padding: "1.5rem 2rem", fontFamily: "'Inter','Sarabun',sans-serif" },
+  heading: { color: t.text1, marginBottom: "1rem", fontSize: 18, fontWeight: 700 },
+  subheading: { color: t.text1, margin: "1.2rem 0 0.4rem", fontSize: 15, fontWeight: 600 },
+  hint: { color: t.text3, fontSize: "0.85rem", margin: "0 0 0.6rem" },
+  label: { display: "block", marginBottom: "0.25rem", fontWeight: 600, fontSize: "0.9rem", color: t.text2 },
   input: {
-    display: "block", width: "100%", padding: "0.45rem 0.6rem",
-    marginBottom: "0.8rem", border: "1px solid #ccc", borderRadius: 6,
-    fontSize: "0.95rem", boxSizing: "border-box",
+    display: "block", width: "100%", padding: "0.5rem 0.7rem",
+    marginBottom: "0.8rem", border: `1.5px solid ${t.border}`, borderRadius: 8,
+    fontSize: "0.95rem", boxSizing: "border-box", background: t.card,
+    color: t.text1, fontFamily: "inherit", outline: "none",
   },
-  select: { padding: "0.45rem 0.6rem", border: "1px solid #ccc", borderRadius: 6, fontSize: "0.95rem" },
+  select: { padding: "0.5rem 0.7rem", border: `1.5px solid ${t.border}`, borderRadius: 8, fontSize: "0.9rem", background: t.card, color: t.text1, fontFamily: "inherit" },
   tagGrid: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: "0.75rem" },
   tag: {
-    padding: "0.3rem 0.8rem", border: "1.5px solid #ccc", borderRadius: 20,
-    background: "#fff", cursor: "pointer", fontSize: "0.85rem", color: "#555",
-    transition: "all .15s",
+    padding: "0.3rem 0.8rem", border: `1.5px solid ${t.border}`, borderRadius: 20,
+    background: t.surface, cursor: "pointer", fontSize: "0.82rem", color: t.text2,
+    transition: "all .15s", fontFamily: "inherit",
   },
-  tagActive: { background: "#0f3460", color: "#fff", borderColor: "#0f3460" },
+  tagActive: { background: t.accent, color: "#fff", borderColor: t.accent },
   univList: { display: "flex", flexDirection: "column", gap: 10, marginBottom: "0.75rem" },
-  univRow: { display: "flex", alignItems: "center", fontSize: "0.95rem", cursor: "pointer", color: "#333" },
+  univRow: { display: "flex", alignItems: "center", fontSize: "0.92rem", cursor: "pointer", color: t.text2 },
   scoreRow: { display: "flex", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap" },
   addBtn: {
-    background: "none", border: "1px dashed #888", borderRadius: 6,
+    background: "none", border: `1px dashed ${t.borderMd}`, borderRadius: 8,
     padding: "0.35rem 0.75rem", cursor: "pointer", marginBottom: "1rem",
     color: "#555", fontSize: "0.9rem",
   },
-  removeBtn: { background: "none", border: "none", cursor: "pointer", color: "#c00", fontSize: "1rem", padding: "0 4px" },
+  removeBtn: { background: "none", border: "none", cursor: "pointer", color: t.fail, fontSize: "1rem", padding: "0 4px" },
   saveBtn: {
-    background: "#0f3460", color: "#fff", border: "none", borderRadius: 8,
-    padding: "0.6rem 1.5rem", cursor: "pointer", fontSize: "1rem", marginTop: "0.5rem",
+    background: t.accent, color: "#fff", border: "none", borderRadius: 8,
+    padding: "0.6rem 1.5rem", cursor: "pointer", fontSize: "1rem", marginTop: "0.5rem", fontFamily: "inherit",
   },
-  error: { color: "#c00", marginBottom: "0.5rem" },
-  success: { color: "#080", marginBottom: "0.5rem" },
+  error:   { color: t.fail, marginBottom: "0.5rem", fontSize: 13 },
+  success: { color: t.pass, marginBottom: "0.5rem", fontSize: 13 },
 };
