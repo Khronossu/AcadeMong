@@ -8,6 +8,7 @@ from db.postgres import fetch, fetchrow
 
 async def recommend_majors(
     user_id: UUID,
+    scores: dict[str, float] = None,
     interests: list[str] = None,
     preferred_universities: list[str] = None,
     limit: int = 5
@@ -16,11 +17,10 @@ async def recommend_majors(
     
     # 1. Fetch user profile
     profile = await fetchrow("SELECT gpax FROM user_profiles WHERE user_id = $1", user_id)
-    gpax = float(profile["gpax"]) if profile and profile["gpax"] else 0.0
+    gpax = float(profile["gpax"]) if profile and profile["gpax"] is not None else None
 
-    # 2. Fetch test scores
-    scores_rows = await fetch("SELECT subject, score FROM user_test_scores WHERE user_id = $1", user_id)
-    user_scores = {row["subject"]: float(row["score"]) for row in scores_rows}
+    # 2. Use provided test scores
+    user_scores = scores or {}
 
     # 3. Fetch all majors and projects via CTE
     query = """
@@ -48,7 +48,10 @@ async def recommend_majors(
         # STAGE 1: Hard Filtering
         # ----------------------------------------------------
         req_gpax = float(p["gpax_min"]) if p["gpax_min"] else 0.0
-        if gpax > 0 and gpax < req_gpax:
+        
+        # If the user has no GPAX data (gpax is None), we allow them to pass this filter
+        # so they can see recommendations even with an incomplete profile.
+        if gpax is not None and gpax < req_gpax:
             continue  # Drop: GPAX too low
 
         # Parse subject reqs (handle the case where json_agg returns [ { subject: null } ] or a JSON string)
@@ -86,7 +89,7 @@ async def recommend_majors(
                 uscore = user_scores.get(subj, 0.0)
                 academic_sum += (uscore / 100.0) * w
                 
-            score += academic_sum * 0.5  # Scale 100 max to 50 max
+            score += min(academic_sum * 0.5, 50.0)  # Scale 100 max to 50 max (capped in case of bad weight data)
         else:
             # If no subject requirements, grant 35/50 as a baseline if GPAX passed.
             score += 35.0
