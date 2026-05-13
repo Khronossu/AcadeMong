@@ -235,6 +235,26 @@ async def eligibility_all(
 
 
 @router.get(
+    "/cutoffs/{admission_project_id}",
+    summary="Historical cutoff scores for an admission project",
+)
+async def get_cutoffs(
+    admission_project_id: UUID,
+    user: dict = Depends(get_current_user),
+):
+    rows = await fetch(
+        """SELECT year, min_admitted_score, max_admitted_score, median_score,
+                  applicants_count, accepted_count
+           FROM historical_cutoffs
+           WHERE admission_project_id = $1
+             AND effective_to IS NULL
+           ORDER BY year ASC""",
+        admission_project_id,
+    )
+    return {"cutoffs": [dict(r) for r in rows]}
+
+
+@router.get(
     "/sessions",
     summary="List chat sessions for current user",
 )

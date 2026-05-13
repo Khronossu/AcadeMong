@@ -1,4 +1,5 @@
 import { useState } from "react";
+import CutoffChart from "./CutoffChart";
 
 const GROUP_OPTIONS = [
   { key: "university", label: "มหาวิทยาลัย" },
@@ -246,6 +247,11 @@ export function ProjectCard({ result, getToken }) {
               </table>
             </>
           )}
+
+          <CutoffChart
+            admissionProjectId={result.admission_project_id}
+            getToken={getToken}
+          />
 
           {result.source_url && (
             <a href={result.source_url} target="_blank" rel="noreferrer" style={styles.link}>
