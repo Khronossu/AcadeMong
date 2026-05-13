@@ -62,8 +62,12 @@ function BubbleIcon({ id, sz, opacity }) {
     ),
     arts: (
       <>
-        <path {...S()} d="M0,-11 L11,0 L0,11 L-11,0 Z" />
-        <circle {...F} r="2.5" />
+        {/* Artist's palette */}
+        <path {...S()} d="M-9,-2 C-9,-9 -3,-11 3,-9 C9,-7 11,-2 9,4 C7,9 1,11 -4,9 C-9,7 -11,3 -9,-2 Z" />
+        <circle {...S()} cx="-1" cy="5.5" r="2.5" />
+        <circle {...F} cx="-4" cy="-5" r="2" />
+        <circle {...F} cx="3" cy="-7" r="1.8" />
+        <circle {...F} cx="7" cy="-1" r="1.8" />
       </>
     ),
     edu: (
@@ -76,10 +80,11 @@ function BubbleIcon({ id, sz, opacity }) {
     ),
     media: (
       <>
-        <circle {...F} cy="7" r="2.5" />
-        <path {...S()} d="M-5,3.5 A6.5,6.5 0 0,1 5,3.5" />
-        <path {...S({ strokeOpacity: 0.75 })} d="M-9,-1 A11.5,11.5 0 0,1 9,-1" />
-        <path {...S({ strokeOpacity: 0.45 })} d="M-13,-5 A16,16 0 0,1 13,-5" />
+        {/* Camera */}
+        <rect {...S()} x="-10" y="-4" width="20" height="13" rx="2" />
+        <circle {...S()} cx="0" cy="2.5" r="4.5" />
+        <circle {...F} cx="0" cy="2.5" r="1.8" />
+        <rect {...S()} x="-4" y="-8" width="8" height="4" rx="1.5" />
       </>
     ),
   }[id];
