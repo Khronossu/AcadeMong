@@ -88,8 +88,6 @@ function ScoreChart({ data }) {
           />
           <Tooltip content={<CustomTooltip />} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <ReferenceLine x={NEW_SYSTEM_YEAR} stroke="#e6a817" strokeDasharray="5 3"
-            label={{ value: "เปลี่ยนระบบสอบ (TGAT/TPAT)", fontSize: 9, fill: "#e6a817", position: "insideTopLeft" }} />
           <ReferenceLine x={nextYear} stroke="#e94560" strokeDasharray="4 2"
             label={{ value: "คาดการณ์", fontSize: 9, fill: "#e94560" }} />
           <Line type="monotone" dataKey="min" name="ต่ำสุด" stroke="#0f3460" strokeWidth={2} dot={{ r: 4 }} connectNulls={false} />
@@ -106,8 +104,8 @@ function ScoreChart({ data }) {
           <strong style={{ color: "#e94560" }}>{project(reg, nextYear)?.toLocaleString() ?? "–"}</strong>
         </div>
       )}
-      {data.some((d) => d.year < NEW_SYSTEM_YEAR) && (
-        <div style={s.note}>⚠ ข้อมูลปี 2020–2022 ใช้ระบบสอบเก่า (PAT/O-NET) ไม่สามารถเปรียบเทียบกับปีหลัง 2023 ได้โดยตรง</div>
+      {hasOldData && (
+        <div style={s.note}>⚠ ซ่อนข้อมูลปี 2020–2022 (ระบบสอบเก่า PAT/O-NET) — ไม่สามารถเปรียบเทียบกับระบบ TGAT/TPAT ได้โดยตรง</div>
       )}
     </div>
   );
@@ -157,8 +155,6 @@ function ApplicantChart({ data }) {
           />
           <Tooltip content={<CustomTooltip suffix="คน" />} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <ReferenceLine x={NEW_SYSTEM_YEAR} stroke="#e6a817" strokeDasharray="5 3"
-            label={{ value: "เปลี่ยนระบบสอบ", fontSize: 9, fill: "#e6a817", position: "insideTopLeft" }} />
           <ReferenceLine x={nextYear} stroke="#e94560" strokeDasharray="4 2" />
           <Bar dataKey="applicants" name="ผู้สมัคร" fill="#0f3460" radius={[4, 4, 0, 0]} />
           <Bar dataKey="accepted" name="รับจริง" fill="#0a7" radius={[4, 4, 0, 0]} />
@@ -220,13 +216,18 @@ export default function CutoffChart({ admissionProjectId, getToken }) {
   if (loading) return <div style={s.placeholder}>กำลังโหลดข้อมูลสถิติย้อนหลัง...</div>;
   if (!data || data.length === 0) return <div style={s.placeholder}>ไม่มีข้อมูลสถิติย้อนหลัง</div>;
 
-  const scoreData = data.map((d) => ({
+  const hasOldData = data.some((d) => d.year < NEW_SYSTEM_YEAR);
+
+  // Only display new-system data (2023+) in the charts
+  const newData = data.filter((d) => d.year >= NEW_SYSTEM_YEAR);
+
+  const scoreData = newData.map((d) => ({
     year: d.year,
     min: d.min_admitted_score,
     max: d.max_admitted_score,
   }));
 
-  const applicantData = data.map((d) => ({
+  const applicantData = newData.map((d) => ({
     year: d.year,
     applicants: d.applicants_count,
     accepted: d.accepted_count,

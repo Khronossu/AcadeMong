@@ -4,6 +4,8 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ReferenceLine,
 } from "recharts";
 
+const NEW_SYSTEM_YEAR = 2023;
+
 const PALETTE = [
   "#0f3460", "#e94560", "#0a7", "#e6a817", "#7c3aed",
   "#0891b2", "#dc2626", "#059669", "#d97706", "#6366f1",
@@ -94,7 +96,9 @@ export default function EligibilityOverview({ results, getToken }) {
   let multiLineData = [];
   if (trendData) {
     const allYears = new Set();
-    Object.values(trendData).forEach((cuts) => cuts.forEach((c) => allYears.add(c.year)));
+    Object.values(trendData).forEach((cuts) =>
+      cuts.filter((c) => c.year >= NEW_SYSTEM_YEAR).forEach((c) => allYears.add(c.year))
+    );
     const years = [...allYears].sort();
 
     // Add one projected year for trendlines
@@ -113,7 +117,7 @@ export default function EligibilityOverview({ results, getToken }) {
     multiLineData = allYearsWithNext.map((year) => {
       const row = { year };
       Object.entries(trendData).forEach(([id, cuts]) => {
-        const match = cuts.find((c) => c.year === year);
+        const match = cuts.find((c) => c.year === year && c.year >= NEW_SYSTEM_YEAR);
         row[id] = match?.min_admitted_score ?? null;
         // Trend projection for last year
         if (year === nextYear && regressions[id]) {
@@ -183,8 +187,6 @@ export default function EligibilityOverview({ results, getToken }) {
                       wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
                       formatter={(value) => programLabels[value] || value}
                     />
-                    <ReferenceLine x={2023} stroke="#e6a817" strokeDasharray="5 3"
-                      label={{ value: "เปลี่ยนระบบสอบ", fontSize: 9, fill: "#e6a817", position: "insideTopLeft" }} />
                     {Object.keys(trendData || {}).map((id, i) => (
                       <Line
                         key={id}
