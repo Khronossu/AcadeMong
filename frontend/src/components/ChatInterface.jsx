@@ -6,6 +6,12 @@ const MODE_LABELS = {
   tcas_rag: { th: "TCAS Advisor",    desc: "ตรวจสอบสิทธิ์และเปรียบเทียบคณะ",  icon: "🎓" },
 };
 
+function truncateName(text, max = 40) {
+  if (!text) return null;
+  const clean = text.trim();
+  return clean.length <= max ? clean : clean.slice(0, max).trimEnd() + "…";
+}
+
 const s = {
   container: {
     display: "flex",
@@ -46,13 +52,25 @@ const s = {
     background: active ? "rgba(255,255,255,.12)" : "transparent",
     borderLeft: active ? "3px solid #e94560" : "3px solid transparent",
     transition: "background .15s",
+    position: "relative",
   }),
-  sessionMode: { fontSize: 11, color: "#aaa", textTransform: "uppercase", letterSpacing: .5 },
-  sessionId: { fontSize: 12, color: "#ccc", marginTop: 2, fontFamily: "monospace" },
+  sessionMode: { fontSize: 11, color: "#aaa", textTransform: "uppercase", letterSpacing: .5, marginBottom: 2 },
+  sessionName: { fontSize: 13, color: "#eee", lineHeight: 1.4, wordBreak: "break-word" },
+  sessionNameInput: {
+    width: "100%",
+    background: "rgba(255,255,255,.1)",
+    border: "1px solid rgba(255,255,255,.3)",
+    borderRadius: 4,
+    color: "#fff",
+    fontSize: 13,
+    padding: "2px 6px",
+    outline: "none",
+    fontFamily: "Sarabun, sans-serif",
+    boxSizing: "border-box",
+  },
 
-  main: { flex: 1, display: "flex", flexDirection: "column" },
+  main: { flex: 1, display: "flex", flexDirection: "column", minWidth: 0 },
 
-  // Mode selector
   modeScreen: {
     flex: 1,
     display: "flex",
@@ -79,7 +97,32 @@ const s = {
   modeName: { fontWeight: 700, color: "#0f3460", marginBottom: 4 },
   modeDesc: { fontSize: 13, color: "#666" },
 
-  // Chat thread
+  chatHeader: {
+    padding: "10px 20px",
+    borderBottom: "1px solid #e0e0e0",
+    display: "flex",
+    alignItems: "center",
+    gap: 10,
+    background: "#fafafa",
+    flexShrink: 0,
+  },
+  chatHeaderTitle: { fontSize: 14, fontWeight: 600, color: "#333", flex: 1 },
+  modePill: (active) => ({
+    display: "flex",
+    alignItems: "center",
+    gap: 5,
+    padding: "4px 10px",
+    borderRadius: 20,
+    border: "1.5px solid",
+    borderColor: active ? "#0f3460" : "#ccc",
+    background: active ? "#eef2ff" : "#f5f5f5",
+    cursor: "pointer",
+    fontSize: 12,
+    fontWeight: 600,
+    color: active ? "#0f3460" : "#888",
+    transition: "all .15s",
+  }),
+
   messages: {
     flex: 1,
     overflowY: "auto",
@@ -150,14 +193,19 @@ function TypingIndicator() {
 export default function ChatInterface({ getToken }) {
   const [sessions, setSessions] = useState([]);
   const [activeSession, setActiveSession] = useState(null);
+  const [pendingMode, setPendingMode] = useState(null); // chosen mode before first message
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const [hoveredMode, setHoveredMode] = useState(null);
+  const [renamingId, setRenamingId] = useState(null);
+  const [renameValue, setRenameValue] = useState("");
   const bottomRef = useRef(null);
+  const renameInputRef = useRef(null);
 
   useEffect(() => { loadSessions(); }, []);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, sending]);
+  useEffect(() => { if (renamingId) renameInputRef.current?.focus(); }, [renamingId]);
 
   async function api(path, opts = {}) {
     const token = await getToken();
@@ -178,37 +226,83 @@ export default function ChatInterface({ getToken }) {
 
   async function selectSession(session) {
     setActiveSession(session);
+    setPendingMode(null);
     try {
       const data = await api(`/api/chat/${session.id}/messages`);
       setMessages(data.messages || []);
     } catch { setMessages([]); }
   }
 
-  async function startNewSession(mode) {
+  function pickMode(mode) {
+    // Don't create session yet — wait for first message
+    setPendingMode(mode);
+    setActiveSession(null);
+    setMessages([]);
+  }
+
+  async function switchMode(mode) {
+    if (!activeSession || mode === activeSession.ai_mode) return;
     try {
-      const data = await api("/api/chat/session", {
-        method: "POST",
+      await api(`/api/chat/${activeSession.id}/mode`, {
+        method: "PATCH",
         body: JSON.stringify({ ai_mode: mode }),
       });
-      const newSession = { id: data.session_id, ai_mode: data.ai_mode };
-      setSessions((prev) => [newSession, ...prev]);
-      setActiveSession(newSession);
-      setMessages([]);
-    } catch (e) { alert("ไม่สามารถสร้างเซสชันได้: " + e.message); }
+      const updated = { ...activeSession, ai_mode: mode };
+      setActiveSession(updated);
+      setSessions((prev) => prev.map((s) => s.id === updated.id ? updated : s));
+    } catch (e) { alert("ไม่สามารถเปลี่ยนโหมดได้: " + e.message); }
   }
 
   async function sendMessage() {
     const text = input.trim();
-    if (!text || !activeSession || sending) return;
+    if (!text || sending) return;
     setInput("");
-    setMessages((prev) => [...prev, { role: "user", content: text }]);
     setSending(true);
+
+    let session = activeSession;
+
+    // Lazy session creation — create on first message
+    if (!session && pendingMode) {
+      try {
+        const data = await api("/api/chat/session", {
+          method: "POST",
+          body: JSON.stringify({ ai_mode: pendingMode }),
+        });
+        session = { id: data.session_id, ai_mode: data.ai_mode, name: null };
+        setActiveSession(session);
+        setSessions((prev) => [session, ...prev]);
+        setPendingMode(null);
+      } catch (e) {
+        setSending(false);
+        alert("ไม่สามารถสร้างเซสชันได้: " + e.message);
+        return;
+      }
+    }
+
+    if (!session) { setSending(false); return; }
+
+    setMessages((prev) => [...prev, { role: "user", content: text }]);
+
     try {
-      const data = await api(`/api/chat/${activeSession.id}/message`, {
+      const data = await api(`/api/chat/${session.id}/message`, {
         method: "POST",
         body: JSON.stringify({ content: text }),
       });
       setMessages((prev) => [...prev, { role: data.role, content: data.content }]);
+
+      // Auto-name the session from the first user message
+      if (!session.name) {
+        const autoName = truncateName(text);
+        if (autoName) {
+          await api(`/api/chat/${session.id}/name`, {
+            method: "PATCH",
+            body: JSON.stringify({ name: autoName }),
+          });
+          const named = { ...session, name: autoName };
+          setActiveSession(named);
+          setSessions((prev) => prev.map((s) => s.id === named.id ? named : s));
+        }
+      }
     } catch (e) {
       setMessages((prev) => [...prev, { role: "assistant", content: `⚠️ เกิดข้อผิดพลาด: ${e.message}` }]);
     } finally { setSending(false); }
@@ -217,6 +311,27 @@ export default function ChatInterface({ getToken }) {
   function handleKey(e) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   }
+
+  function startRename(sess, e) {
+    e.stopPropagation();
+    setRenamingId(sess.id);
+    setRenameValue(sess.name || "");
+  }
+
+  async function commitRename(sessId) {
+    setRenamingId(null);
+    const name = renameValue.trim();
+    try {
+      await api(`/api/chat/${sessId}/name`, {
+        method: "PATCH",
+        body: JSON.stringify({ name }),
+      });
+      setSessions((prev) => prev.map((s) => s.id === sessId ? { ...s, name: name || null } : s));
+      if (activeSession?.id === sessId) setActiveSession((s) => ({ ...s, name: name || null }));
+    } catch { /* ignore */ }
+  }
+
+  const currentMode = activeSession?.ai_mode || pendingMode;
 
   return (
     <>
@@ -229,13 +344,15 @@ export default function ChatInterface({ getToken }) {
         .msg-content ul,.msg-content ol{margin:4px 0;padding-left:20px}
         .msg-content code{background:rgba(0,0,0,.08);padding:1px 5px;border-radius:4px;font-size:13px}
         .msg-content pre{background:#1e1e2e;color:#cdd6f4;padding:12px;border-radius:8px;overflow-x:auto;font-size:13px}
+        .session-item:hover .rename-hint{opacity:1}
+        .rename-hint{opacity:0;transition:opacity .15s;font-size:10px;color:#aaa;margin-top:2px}
       `}</style>
 
       <div style={s.container}>
         {/* Sidebar */}
         <div style={s.sidebar}>
           <div style={s.sidebarHeader}>
-            <button style={s.newChatBtn} onClick={() => { setActiveSession(null); setMessages([]); }}>
+            <button style={s.newChatBtn} onClick={() => { setActiveSession(null); setMessages([]); setPendingMode(null); }}>
               + แชทใหม่
             </button>
           </div>
@@ -243,11 +360,32 @@ export default function ChatInterface({ getToken }) {
             {sessions.map((sess) => (
               <div
                 key={sess.id}
+                className="session-item"
                 style={s.sessionItem(activeSession?.id === sess.id)}
                 onClick={() => selectSession(sess)}
               >
-                <div style={s.sessionMode}>{MODE_LABELS[sess.ai_mode]?.th || sess.ai_mode}</div>
-                <div style={s.sessionId}>{sess.id.slice(0, 8)}…</div>
+                <div style={s.sessionMode}>{MODE_LABELS[sess.ai_mode]?.icon} {MODE_LABELS[sess.ai_mode]?.th || sess.ai_mode}</div>
+                {renamingId === sess.id ? (
+                  <input
+                    ref={renameInputRef}
+                    style={s.sessionNameInput}
+                    value={renameValue}
+                    onChange={(e) => setRenameValue(e.target.value)}
+                    onBlur={() => commitRename(sess.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitRename(sess.id);
+                      if (e.key === "Escape") setRenamingId(null);
+                    }}
+                    onClick={(e) => e.stopPropagation()}
+                  />
+                ) : (
+                  <>
+                    <div style={s.sessionName} onDoubleClick={(e) => startRename(sess, e)}>
+                      {sess.name || <span style={{ color: "#888", fontStyle: "italic" }}>แชทใหม่</span>}
+                    </div>
+                    <div className="rename-hint">ดับเบิลคลิกเพื่อเปลี่ยนชื่อ</div>
+                  </>
+                )}
               </div>
             ))}
           </div>
@@ -255,7 +393,7 @@ export default function ChatInterface({ getToken }) {
 
         {/* Main area */}
         <div style={s.main}>
-          {!activeSession ? (
+          {!currentMode ? (
             // Mode selector
             <div style={s.modeScreen}>
               <div>
@@ -269,7 +407,7 @@ export default function ChatInterface({ getToken }) {
                     style={s.modeCard(hoveredMode === key)}
                     onMouseEnter={() => setHoveredMode(key)}
                     onMouseLeave={() => setHoveredMode(null)}
-                    onClick={() => startNewSession(key)}
+                    onClick={() => pickMode(key)}
                   >
                     <div style={s.modeIcon}>{info.icon}</div>
                     <div style={s.modeName}>{info.th}</div>
@@ -279,13 +417,28 @@ export default function ChatInterface({ getToken }) {
               </div>
             </div>
           ) : (
-            // Chat thread
             <>
+              {/* Chat header with mode toggle */}
+              <div style={s.chatHeader}>
+                <span style={s.chatHeaderTitle}>
+                  {activeSession?.name || (pendingMode ? "แชทใหม่" : "แชท")}
+                </span>
+                {Object.entries(MODE_LABELS).map(([key, info]) => (
+                  <div
+                    key={key}
+                    style={s.modePill(currentMode === key)}
+                    onClick={() => activeSession ? switchMode(key) : setPendingMode(key)}
+                  >
+                    {info.icon} {info.th}
+                  </div>
+                ))}
+              </div>
+
+              {/* Chat thread */}
               <div style={s.messages}>
                 {messages.length === 0 && (
                   <p style={{ color: "#aaa", textAlign: "center", margin: "auto" }}>
-                    {MODE_LABELS[activeSession.ai_mode]?.icon} เริ่มต้นการสนทนากับ{" "}
-                    {MODE_LABELS[activeSession.ai_mode]?.th}
+                    {MODE_LABELS[currentMode]?.icon} เริ่มต้นการสนทนากับ {MODE_LABELS[currentMode]?.th}
                   </p>
                 )}
                 {messages.map((msg, i) => (

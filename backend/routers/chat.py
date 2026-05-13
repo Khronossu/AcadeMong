@@ -51,6 +51,14 @@ class SendMessageRequest(BaseModel):
     content: str
 
 
+class RenameSessionRequest(BaseModel):
+    name: str
+
+
+class UpdateModeRequest(BaseModel):
+    ai_mode: str
+
+
 class MessageResponse(BaseModel):
     role: str
     content: str
@@ -215,7 +223,7 @@ async def eligibility_all(
 async def list_sessions(user: dict = Depends(get_current_user)):
     user_id: UUID = user["id"]
     sessions = await fetch(
-        """SELECT id, ai_mode, created_at
+        """SELECT id, ai_mode, name, created_at
            FROM chat_sessions
            WHERE user_id = $1
            ORDER BY created_at DESC
@@ -223,6 +231,49 @@ async def list_sessions(user: dict = Depends(get_current_user)):
         user_id,
     )
     return {"sessions": [dict(s) for s in sessions]}
+
+
+@router.patch(
+    "/{session_id}/name",
+    summary="Rename a chat session",
+)
+async def rename_session(
+    session_id: UUID,
+    body: RenameSessionRequest,
+    user: dict = Depends(get_current_user),
+):
+    session = await get_session(session_id)
+    if not session or session["user_id"] != user["id"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    name = body.name.strip()[:200] or None
+    await execute(
+        "UPDATE chat_sessions SET name = $1 WHERE id = $2",
+        name, session_id,
+    )
+    return {"ok": True}
+
+
+@router.patch(
+    "/{session_id}/mode",
+    summary="Switch AI mode for a session",
+)
+async def update_mode(
+    session_id: UUID,
+    body: UpdateModeRequest,
+    user: dict = Depends(get_current_user),
+):
+    session = await get_session(session_id)
+    if not session or session["user_id"] != user["id"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    try:
+        mode = validate_mode(body.ai_mode)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(exc))
+    await execute(
+        "UPDATE chat_sessions SET ai_mode = $1 WHERE id = $2",
+        mode, session_id,
+    )
+    return {"ok": True, "ai_mode": mode}
 
 
 @router.post(

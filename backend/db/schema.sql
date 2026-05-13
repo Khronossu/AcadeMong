@@ -155,6 +155,7 @@ CREATE TABLE IF NOT EXISTS chat_sessions (
     id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     user_id     UUID REFERENCES users(id) ON DELETE CASCADE,
     ai_mode     VARCHAR(20) NOT NULL, -- 'dreamer' OR 'tcas_rag'
+    name        VARCHAR(200),         -- user-set or auto-generated from first message
     created_at  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
