@@ -41,7 +41,7 @@ const CustomTooltip = ({ active, payload, label, suffix }) => {
 
 const NEW_SYSTEM_YEAR = 2023; // TGAT/TPAT/A-Level replaced PAT/O-NET
 
-function ScoreChart({ data }) {
+function ScoreChart({ data, hasOldData }) {
   // Only use new-system years for trendline (2023+)
   const newSystemData = data.filter((d) => d.year >= NEW_SYSTEM_YEAR && d.min != null);
   const reg = linearRegression(newSystemData.map((d) => ({ x: d.year, y: d.min })));
@@ -243,7 +243,7 @@ export default function CutoffChart({ admissionProjectId, getToken }) {
   return (
     <div style={s.container}>
       <div style={s.sectionTitle}>สถิติย้อนหลัง {data[0].year}–{data[data.length - 1].year}</div>
-      {hasScoreData && <ScoreChart data={scoreData} />}
+      {hasScoreData && <ScoreChart data={scoreData} hasOldData={hasOldData} />}
       {hasApplicantData && <ApplicantChart data={applicantData} />}
     </div>
   );
