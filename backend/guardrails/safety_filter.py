@@ -33,7 +33,7 @@ OLLAMA_BASE_URL = f"http://{os.getenv('OLLAMA_HOST', 'ollama')}:{os.getenv('OLLA
 
 # Categories we care about — others (e.g. S1 Violent Crimes) are very unlikely
 # in a university admissions context and produce false positives
-_WATCH_CATEGORIES = {"S6", "S10", "S11"}
+_WATCH_CATEGORIES = {"S10", "S11"}  # S6 (Specialized Advice) excluded — too aggressive for education context
 
 _SAFE_REFUSAL = (
     "ขออภัย ฉันไม่สามารถตอบคำถามนี้ได้ "

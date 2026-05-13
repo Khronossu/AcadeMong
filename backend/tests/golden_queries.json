@@ -261,12 +261,12 @@
   {
     "id": "career-005",
     "category": "career",
-    "description": "Low GPAX + competitive major guidance",
+    "description": "Low GPAX + competitive major guidance (redirect to Mode B acceptable)",
     "mode": "dreamer",
     "input": "ฉัน GPAX 1.8 อยากเป็นหมอ ทำได้ไหม",
     "expect": {
       "http_status": 200,
-      "response_contains_any": ["ทางเลือก", "แนะนำ", "พยาบาล", "สาธารณสุข", "อาชีพ", "เส้นทาง", "ยาก", "ปรับ", "แพทย์", "หมอ", "สุขภาพ", "ศึกษา"]
+      "response_contains_any": ["ทางเลือก", "แนะนำ", "พยาบาล", "สาธารณสุข", "อาชีพ", "เส้นทาง", "ยาก", "ปรับ", "แพทย์", "หมอ", "สุขภาพ", "ศึกษา", "AI 2", "TCAS Advisor", "เปลี่ยน", "สิทธิ์"]
     }
   },
   {
