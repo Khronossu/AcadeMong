@@ -39,16 +39,21 @@ const CustomTooltip = ({ active, payload, label, suffix }) => {
   );
 };
 
+const NEW_SYSTEM_YEAR = 2023; // TGAT/TPAT/A-Level replaced PAT/O-NET
+
 function ScoreChart({ data }) {
-  const validMin = data.filter((d) => d.min != null);
-  const reg = linearRegression(validMin.map((d) => ({ x: d.year, y: d.min })));
+  // Only use new-system years for trendline (2023+)
+  const newSystemData = data.filter((d) => d.year >= NEW_SYSTEM_YEAR && d.min != null);
+  const reg = linearRegression(newSystemData.map((d) => ({ x: d.year, y: d.min })));
   const lastYear = data[data.length - 1]?.year;
   const nextYear = lastYear + 1;
 
-  const allValues = data.flatMap((d) => [d.min, d.max].filter(Boolean));
-  const minVal = allValues.length ? Math.min(...allValues) : 0;
-  const maxVal = allValues.length ? Math.max(...allValues) : 100;
-  const padding = (maxVal - minVal) * 0.1 || 500;
+  // Y axis bounds from new-system data only (old system had different score ranges)
+  const relevantValues = (newSystemData.length ? newSystemData : data)
+    .flatMap((d) => [d.min, d.max].filter(Boolean));
+  const minVal = relevantValues.length ? Math.min(...relevantValues) : 0;
+  const maxVal = relevantValues.length ? Math.max(...relevantValues) : 100;
+  const padding = (maxVal - minVal) * 0.15 || 1000;
   const yMin = Math.max(0, Math.floor((minVal - padding) / 100) * 100);
   const yMax = Math.ceil((maxVal + padding) / 100) * 100;
 
@@ -83,7 +88,10 @@ function ScoreChart({ data }) {
           />
           <Tooltip content={<CustomTooltip />} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <ReferenceLine x={nextYear} stroke="#f0a" strokeDasharray="4 2" label={{ value: "คาดการณ์", fontSize: 10, fill: "#f0a" }} />
+          <ReferenceLine x={NEW_SYSTEM_YEAR} stroke="#e6a817" strokeDasharray="5 3"
+            label={{ value: "เปลี่ยนระบบสอบ (TGAT/TPAT)", fontSize: 9, fill: "#e6a817", position: "insideTopLeft" }} />
+          <ReferenceLine x={nextYear} stroke="#e94560" strokeDasharray="4 2"
+            label={{ value: "คาดการณ์", fontSize: 9, fill: "#e94560" }} />
           <Line type="monotone" dataKey="min" name="ต่ำสุด" stroke="#0f3460" strokeWidth={2} dot={{ r: 4 }} connectNulls={false} />
           <Line type="monotone" dataKey="max" name="สูงสุด" stroke="#aab" strokeWidth={1.5} dot={{ r: 3 }} strokeDasharray="4 2" connectNulls={false} />
           <Line type="monotone" dataKey="trend" name="แนวโน้ม" stroke="#e94560" strokeWidth={1.5} dot={(props) => props.payload.isForecast
@@ -92,18 +100,21 @@ function ScoreChart({ data }) {
           } strokeDasharray="6 3" connectNulls />
         </LineChart>
       </ResponsiveContainer>
-      {reg && lastYear && (
+      {newSystemData.length >= 2 && reg && lastYear && (
         <div style={s.forecast}>
-          คาดการณ์คะแนนต่ำสุด ปี {nextYear}:{" "}
+          คาดการณ์คะแนนต่ำสุด ปี {nextYear} (จากข้อมูลระบบใหม่):{" "}
           <strong style={{ color: "#e94560" }}>{project(reg, nextYear)?.toLocaleString() ?? "–"}</strong>
         </div>
+      )}
+      {data.some((d) => d.year < NEW_SYSTEM_YEAR) && (
+        <div style={s.note}>⚠ ข้อมูลปี 2020–2022 ใช้ระบบสอบเก่า (PAT/O-NET) ไม่สามารถเปรียบเทียบกับปีหลัง 2023 ได้โดยตรง</div>
       )}
     </div>
   );
 }
 
 function ApplicantChart({ data }) {
-  const validApp = data.filter((d) => d.applicants != null);
+  const validApp = data.filter((d) => d.year >= NEW_SYSTEM_YEAR && d.applicants != null);
   const reg = linearRegression(validApp.map((d) => ({ x: d.year, y: d.applicants })));
   const lastYear = data[data.length - 1]?.year;
   const nextYear = lastYear + 1;
@@ -146,7 +157,9 @@ function ApplicantChart({ data }) {
           />
           <Tooltip content={<CustomTooltip suffix="คน" />} />
           <Legend wrapperStyle={{ fontSize: 12 }} />
-          <ReferenceLine x={nextYear} stroke="#f0a" strokeDasharray="4 2" />
+          <ReferenceLine x={NEW_SYSTEM_YEAR} stroke="#e6a817" strokeDasharray="5 3"
+            label={{ value: "เปลี่ยนระบบสอบ", fontSize: 9, fill: "#e6a817", position: "insideTopLeft" }} />
+          <ReferenceLine x={nextYear} stroke="#e94560" strokeDasharray="4 2" />
           <Bar dataKey="applicants" name="ผู้สมัคร" fill="#0f3460" radius={[4, 4, 0, 0]} />
           <Bar dataKey="accepted" name="รับจริง" fill="#0a7" radius={[4, 4, 0, 0]} />
           <Bar dataKey="forecast" name="คาดการณ์ผู้สมัคร" fill="#e94560" radius={[4, 4, 0, 0]} opacity={0.6} />
@@ -239,6 +252,7 @@ const s = {
   badge: { fontSize: "0.75rem", fontWeight: 600, padding: "2px 8px", borderRadius: 12 },
   forecast: { fontSize: "0.82rem", color: "#555", marginTop: 4, textAlign: "right" },
   placeholder: { color: "#aaa", fontSize: "0.85rem", padding: "12px 0", textAlign: "center" },
+  note: { fontSize: "0.75rem", color: "#e6a817", marginTop: 4, background: "#fffbeb", borderRadius: 6, padding: "4px 8px" },
   yearStats: { marginTop: 8, borderTop: "1px solid #eee", paddingTop: 8 },
   yearRow: {
     display: "flex", gap: 16, fontSize: "0.82rem", color: "#555",

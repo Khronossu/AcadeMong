@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ResponsiveContainer, BarChart, Bar, LineChart, Line,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell,
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, Cell, ReferenceLine,
 } from "recharts";
 
 const PALETTE = [
@@ -101,10 +101,11 @@ export default function EligibilityOverview({ results, getToken }) {
     const nextYear = years.length ? Math.max(...years) + 1 : null;
     const allYearsWithNext = nextYear ? [...years, nextYear] : years;
 
-    // Compute regression per program
+    // Compute regression per program — new exam system only (2023+)
+    const NEW_SYSTEM_YEAR = 2023;
     const regressions = {};
     Object.entries(trendData).forEach(([id, cuts]) => {
-      const pts = cuts.filter((c) => c.min_admitted_score != null)
+      const pts = cuts.filter((c) => c.year >= NEW_SYSTEM_YEAR && c.min_admitted_score != null)
         .map((c) => ({ x: c.year, y: c.min_admitted_score }));
       regressions[id] = linearRegression(pts);
     });
@@ -182,6 +183,8 @@ export default function EligibilityOverview({ results, getToken }) {
                       wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
                       formatter={(value) => programLabels[value] || value}
                     />
+                    <ReferenceLine x={2023} stroke="#e6a817" strokeDasharray="5 3"
+                      label={{ value: "เปลี่ยนระบบสอบ", fontSize: 9, fill: "#e6a817", position: "insideTopLeft" }} />
                     {Object.keys(trendData || {}).map((id, i) => (
                       <Line
                         key={id}
