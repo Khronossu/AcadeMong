@@ -7,6 +7,7 @@ Endpoints:
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from decimal import Decimal
 from typing import Optional
@@ -61,6 +62,8 @@ class ProfileUpdateRequest(BaseModel):
     postal_code: Optional[str] = None
     current_school: Optional[str] = None
     gpax: Optional[float] = Field(None, ge=0.0, le=4.0)
+    interests: Optional[list[str]] = None
+    target_universities: Optional[list[str]] = None
     test_scores: Optional[list[TestScoreIn]] = None
 
 
@@ -83,6 +86,8 @@ class ProfileResponse(BaseModel):
     postal_code: Optional[str]
     current_school: Optional[str]
     gpax: Optional[float]
+    interests: Optional[list[str]] = None
+    target_universities: Optional[list[str]] = None
     test_scores: list[TestScoreOut]
 
 
@@ -99,7 +104,7 @@ async def get_profile(user: dict = Depends(get_current_user)):
     profile = await fetchrow(
         """SELECT user_id, first_name, last_name, date_of_birth, avatar_url,
                   address, sub_district, district, province, postal_code,
-                  current_school, gpax
+                  current_school, gpax, interests, target_universities
            FROM user_profiles WHERE user_id = $1""",
         user_id,
     )
@@ -116,12 +121,14 @@ async def get_profile(user: dict = Depends(get_current_user)):
             avatar_url=None, address=None, sub_district=None,
             district=None, province=None, postal_code=None,
             current_school=None, gpax=None,
+            interests=None, target_universities=None,
             test_scores=[TestScoreOut(**dict(s)) for s in scores],
         )
 
+    p = dict(profile)
     return ProfileResponse(
-        **{k: v for k, v in dict(profile).items() if k != "gpax"},
-        gpax=float(profile["gpax"]) if profile["gpax"] is not None else None,
+        **{k: v for k, v in p.items() if k not in ("gpax",)},
+        gpax=float(p["gpax"]) if p["gpax"] is not None else None,
         test_scores=[TestScoreOut(**dict(s)) for s in scores],
     )
 
@@ -140,6 +147,9 @@ async def update_profile(
     existing = await fetchrow(
         "SELECT id FROM user_profiles WHERE user_id = $1", user_id
     )
+    interests_json = json.dumps(req.interests) if req.interests is not None else None
+    target_univ_json = json.dumps(req.target_universities) if req.target_universities is not None else None
+
     if existing:
         await execute(
             """UPDATE user_profiles
@@ -154,13 +164,16 @@ async def update_profile(
                    postal_code = COALESCE($9, postal_code),
                    current_school = COALESCE($10, current_school),
                    gpax = COALESCE($11, gpax),
+                   interests = COALESCE($12::jsonb, interests),
+                   target_universities = COALESCE($13::jsonb, target_universities),
                    updated_at = CURRENT_TIMESTAMP
-               WHERE user_id = $12""",
+               WHERE user_id = $14""",
             req.first_name, req.last_name, req.date_of_birth,
             req.avatar_url, req.address, req.sub_district,
             req.district, req.province, req.postal_code,
             req.current_school,
             Decimal(str(req.gpax)) if req.gpax is not None else None,
+            interests_json, target_univ_json,
             user_id,
         )
     else:
@@ -168,14 +181,15 @@ async def update_profile(
             """INSERT INTO user_profiles
                (user_id, first_name, last_name, date_of_birth, avatar_url,
                 address, sub_district, district, province, postal_code,
-                current_school, gpax)
-               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)""",
+                current_school, gpax, interests, target_universities)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14::jsonb)""",
             user_id,
             req.first_name, req.last_name, req.date_of_birth,
             req.avatar_url, req.address, req.sub_district,
             req.district, req.province, req.postal_code,
             req.current_school,
             Decimal(str(req.gpax)) if req.gpax is not None else None,
+            interests_json, target_univ_json,
         )
 
     if req.test_scores is not None:

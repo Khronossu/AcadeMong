@@ -8,11 +8,31 @@ const SUBJECTS = [
   "A_LEVEL_THAI", "A_LEVEL_ENGLISH", "A_LEVEL_SOCIAL_STUDIES",
 ];
 
+const INTEREST_TAGS = [
+  "วิทยาศาสตร์", "คณิตศาสตร์", "เทคโนโลยี", "วิศวกรรม",
+  "แพทยศาสตร์", "เภสัชศาสตร์", "ทันตแพทยศาสตร์", "พยาบาลศาสตร์",
+  "ศิลปะ", "ดนตรี", "สถาปัตยกรรม", "การออกแบบ",
+  "บริหารธุรกิจ", "การตลาด", "การเงิน", "การบัญชี",
+  "นิติศาสตร์", "รัฐศาสตร์", "สังคมศาสตร์", "มนุษยศาสตร์",
+  "ภาษาต่างประเทศ", "สื่อสารมวลชน", "นิเทศศาสตร์",
+  "เกษตรศาสตร์", "สิ่งแวดล้อม", "การกีฬา",
+];
+
+const TARGET_UNIVERSITIES = [
+  "จุฬาลงกรณ์มหาวิทยาลัย",
+  "มหาวิทยาลัยมหิดล",
+  "มหาวิทยาลัยเกษตรศาสตร์",
+  "มหาวิทยาลัยธรรมศาสตร์",
+  "มหาวิทยาลัยศรีนครินทรวิโรฒ",
+];
+
 const CURRENT_YEAR = new Date().getFullYear();
 
 export default function ProfileForm({ getToken, onSaved }) {
   const [gpax, setGpax] = useState("");
   const [school, setSchool] = useState("");
+  const [interests, setInterests] = useState([]);
+  const [targetUniversities, setTargetUniversities] = useState([]);
   const [scores, setScores] = useState([{ subject: "TGAT1", score: "", exam_year: CURRENT_YEAR }]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
@@ -25,6 +45,8 @@ export default function ProfileForm({ getToken, onSaved }) {
       .then((data) => {
         if (data.gpax != null) setGpax(String(data.gpax));
         if (data.current_school) setSchool(data.current_school);
+        if (data.interests?.length) setInterests(data.interests);
+        if (data.target_universities?.length) setTargetUniversities(data.target_universities);
         if (data.test_scores?.length) {
           setScores(data.test_scores.map((s) => ({
             subject: s.subject,
@@ -35,6 +57,18 @@ export default function ProfileForm({ getToken, onSaved }) {
       })
       .catch(() => {});
   }, []);
+
+  function toggleInterest(tag) {
+    setInterests((prev) =>
+      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  }
+
+  function toggleUniversity(name) {
+    setTargetUniversities((prev) =>
+      prev.includes(name) ? prev.filter((u) => u !== name) : [...prev, name]
+    );
+  }
 
   function addScore() {
     setScores((prev) => [...prev, { subject: "TGAT1", score: "", exam_year: CURRENT_YEAR }]);
@@ -65,6 +99,8 @@ export default function ProfileForm({ getToken, onSaved }) {
     const body = {
       gpax: gpax !== "" ? parseFloat(gpax) : null,
       current_school: school || null,
+      interests: interests.length ? interests : null,
+      target_universities: targetUniversities.length ? targetUniversities : null,
       test_scores: validScores,
     };
 
@@ -72,10 +108,7 @@ export default function ProfileForm({ getToken, onSaved }) {
       const token = await getToken();
       const res = await fetch("/api/profile/me", {
         method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
       });
       if (!res.ok) {
@@ -98,10 +131,7 @@ export default function ProfileForm({ getToken, onSaved }) {
       <label style={styles.label}>GPAX (0.00 – 4.00)</label>
       <input
         style={styles.input}
-        type="number"
-        step="0.01"
-        min="0"
-        max="4"
+        type="number" step="0.01" min="0" max="4"
         value={gpax}
         onChange={(e) => setGpax(e.target.value)}
         placeholder="เช่น 3.75"
@@ -116,6 +146,42 @@ export default function ProfileForm({ getToken, onSaved }) {
         placeholder="ชื่อโรงเรียน"
       />
 
+      {/* Interests */}
+      <h3 style={styles.subheading}>ความสนใจ</h3>
+      <p style={styles.hint}>เลือกสาขาที่สนใจ (เลือกได้หลายอย่าง)</p>
+      <div style={styles.tagGrid}>
+        {INTEREST_TAGS.map((tag) => (
+          <button
+            key={tag}
+            type="button"
+            onClick={() => toggleInterest(tag)}
+            style={{
+              ...styles.tag,
+              ...(interests.includes(tag) ? styles.tagActive : {}),
+            }}
+          >
+            {tag}
+          </button>
+        ))}
+      </div>
+
+      {/* Target universities */}
+      <h3 style={styles.subheading}>มหาวิทยาลัยที่สนใจ</h3>
+      <div style={styles.univList}>
+        {TARGET_UNIVERSITIES.map((u) => (
+          <label key={u} style={styles.univRow}>
+            <input
+              type="checkbox"
+              checked={targetUniversities.includes(u)}
+              onChange={() => toggleUniversity(u)}
+              style={{ marginRight: 8 }}
+            />
+            {u}
+          </label>
+        ))}
+      </div>
+
+      {/* Test scores */}
       <h3 style={styles.subheading}>คะแนนสอบ</h3>
       {scores.map((s, i) => (
         <div key={i} style={styles.scoreRow}>
@@ -130,19 +196,14 @@ export default function ProfileForm({ getToken, onSaved }) {
           </select>
           <input
             style={{ ...styles.input, width: "80px", margin: "0 8px" }}
-            type="number"
-            step="0.01"
-            min="0"
-            max="100"
+            type="number" step="0.01" min="0" max="100"
             value={s.score}
             onChange={(e) => updateScore(i, "score", e.target.value)}
             placeholder="คะแนน"
           />
           <input
             style={{ ...styles.input, width: "70px", margin: "0 8px 0 0" }}
-            type="number"
-            min="2020"
-            max="2100"
+            type="number" min="2020" max="2100"
             value={s.exam_year}
             onChange={(e) => updateScore(i, "exam_year", e.target.value)}
           />
@@ -152,7 +213,7 @@ export default function ProfileForm({ getToken, onSaved }) {
       <button type="button" onClick={addScore} style={styles.addBtn}>+ เพิ่มวิชา</button>
 
       {error && <p style={styles.error}>{error}</p>}
-      {success && <p style={styles.success}>บันทึกสำเร็จ</p>}
+      {success && <p style={styles.success}>บันทึกสำเร็จ ✓</p>}
 
       <button type="submit" disabled={saving} style={styles.saveBtn}>
         {saving ? "กำลังบันทึก..." : "บันทึกโปรไฟล์"}
@@ -162,33 +223,36 @@ export default function ProfileForm({ getToken, onSaved }) {
 }
 
 const styles = {
-  form: { maxWidth: 600, margin: "0 auto", padding: "1rem" },
+  form: { maxWidth: 640, margin: "0 auto", padding: "1rem" },
   heading: { color: "#1a1a2e", marginBottom: "1rem" },
-  subheading: { color: "#16213e", margin: "1.2rem 0 0.5rem" },
+  subheading: { color: "#16213e", margin: "1.2rem 0 0.4rem" },
+  hint: { color: "#888", fontSize: "0.85rem", margin: "0 0 0.6rem" },
   label: { display: "block", marginBottom: "0.25rem", fontWeight: 600, fontSize: "0.9rem" },
   input: {
     display: "block", width: "100%", padding: "0.45rem 0.6rem",
     marginBottom: "0.8rem", border: "1px solid #ccc", borderRadius: 6,
     fontSize: "0.95rem", boxSizing: "border-box",
   },
-  select: {
-    padding: "0.45rem 0.6rem", border: "1px solid #ccc",
-    borderRadius: 6, fontSize: "0.95rem",
+  select: { padding: "0.45rem 0.6rem", border: "1px solid #ccc", borderRadius: 6, fontSize: "0.95rem" },
+  tagGrid: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: "0.75rem" },
+  tag: {
+    padding: "0.3rem 0.8rem", border: "1.5px solid #ccc", borderRadius: 20,
+    background: "#fff", cursor: "pointer", fontSize: "0.85rem", color: "#555",
+    transition: "all .15s",
   },
+  tagActive: { background: "#0f3460", color: "#fff", borderColor: "#0f3460" },
+  univList: { display: "flex", flexDirection: "column", gap: 10, marginBottom: "0.75rem" },
+  univRow: { display: "flex", alignItems: "center", fontSize: "0.95rem", cursor: "pointer", color: "#333" },
   scoreRow: { display: "flex", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap" },
   addBtn: {
     background: "none", border: "1px dashed #888", borderRadius: 6,
     padding: "0.35rem 0.75rem", cursor: "pointer", marginBottom: "1rem",
     color: "#555", fontSize: "0.9rem",
   },
-  removeBtn: {
-    background: "none", border: "none", cursor: "pointer",
-    color: "#c00", fontSize: "1rem", padding: "0 4px",
-  },
+  removeBtn: { background: "none", border: "none", cursor: "pointer", color: "#c00", fontSize: "1rem", padding: "0 4px" },
   saveBtn: {
     background: "#0f3460", color: "#fff", border: "none", borderRadius: 8,
-    padding: "0.6rem 1.5rem", cursor: "pointer", fontSize: "1rem",
-    marginTop: "0.5rem", opacity: 1,
+    padding: "0.6rem 1.5rem", cursor: "pointer", fontSize: "1rem", marginTop: "0.5rem",
   },
   error: { color: "#c00", marginBottom: "0.5rem" },
   success: { color: "#080", marginBottom: "0.5rem" },

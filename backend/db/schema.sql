@@ -28,9 +28,11 @@ CREATE TABLE IF NOT EXISTS user_profiles (
     district        VARCHAR(100), -- เขต/อำเภอ
     province        VARCHAR(100), -- จังหวัด
     postal_code     VARCHAR(10),
-    current_school  VARCHAR(255),
-    gpax            NUMERIC(3, 2), -- 0.00 to 4.00
-    updated_at      TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    current_school      VARCHAR(255),
+    gpax                NUMERIC(3, 2), -- 0.00 to 4.00
+    interests           JSONB,         -- list of interest tags e.g. ["Science","Technology"]
+    target_universities JSONB,         -- list of university names the student is targeting
+    updated_at          TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 -- ==========================================
