@@ -6,6 +6,7 @@ import ChatInterface from "./components/ChatInterface";
 import CareerPathView from "./components/CareerPathView";
 import SavedMajorsView from "./components/SavedMajorsView";
 import ErrorBoundary from "./components/ErrorBoundary";
+import ConfirmDialog from "./components/ConfirmDialog";
 import { t } from "./theme";
 import { useWindowSize, isMobile } from "./hooks/useWindowSize";
 
@@ -142,8 +143,8 @@ function AppContent({ getToken, username, signOut }) {
           </div>
         )}
 
-        {/* Tab content */}
-        <div style={{ display: tab === "chat" ? "flex" : "none", flex: 1, overflow: "hidden", height: mobile ? "calc(100% - 52px)" : "100%" }}>
+        {/* Tab content — flex:1 + minHeight:0 so the column flex shrinks correctly */}
+        <div style={{ display: tab === "chat" ? "flex" : "none", flex: 1, minHeight: 0, overflow: "hidden" }}>
           <ErrorBoundary>
             <ChatInterface
               getToken={getToken}
@@ -161,32 +162,32 @@ function AppContent({ getToken, username, signOut }) {
           { key: "saved",       C: SavedMajorsView },
           { key: "careers",     C: CareerPathView },
         ].map(({ key, C }) => (
-          <div key={key} style={{ display: tab === key ? "block" : "none", flex: 1, overflow: "auto", height: mobile ? "calc(100% - 52px)" : "100%", background: t.bg }}>
+          <div key={key} style={{ display: tab === key ? "flex" : "none", flex: 1, minHeight: 0, overflow: "auto", flexDirection: "column", background: t.bg }}>
             <ErrorBoundary><C getToken={getToken} /></ErrorBoundary>
           </div>
         ))}
         {tab === "settings" && (
-          <div style={{ display: "block", flex: 1, overflow: "auto", height: mobile ? "calc(100% - 52px)" : "100%", background: t.bg }}>
+          <div style={{ flex: 1, minHeight: 0, overflow: "auto", background: t.bg }}>
             <ErrorBoundary><SettingsPage /></ErrorBoundary>
           </div>
         )}
-      </div>
 
-      {/* Mobile bottom nav */}
-      {mobile && (
-        <nav style={s.bottomNav}>
-          {NAV.map(({ key, icon, label }) => (
-            <button
-              key={key}
-              style={{ ...s.bottomNavItem, ...(tab === key ? s.bottomNavActive : {}) }}
-              onClick={() => setTab(key)}
-            >
-              <span style={{ fontSize: 20 }}>{icon}</span>
-              <span style={{ fontSize: 10, marginTop: 2 }}>{label}</span>
-            </button>
-          ))}
-        </nav>
-      )}
+        {/* Bottom tab nav — inside mainWrap so it stacks at the bottom of the column */}
+        {mobile && (
+          <nav style={s.bottomNav}>
+            {NAV.map(({ key, icon, label }) => (
+              <button
+                key={key}
+                style={{ ...s.bottomNavItem, ...(tab === key ? s.bottomNavActive : {}) }}
+                onClick={() => setTab(key)}
+              >
+                <span style={{ fontSize: 26 }}>{icon}</span>
+                <span style={{ fontSize: 13, marginTop: 2 }}>{label}</span>
+              </button>
+            ))}
+          </nav>
+        )}
+      </div>
     </div>
   );
 }
@@ -194,21 +195,21 @@ function AppContent({ getToken, username, signOut }) {
 function SettingsPage() {
   return (
     <div style={{ maxWidth: 600, margin: "0 auto", padding: "1.5rem 2rem", fontFamily: "'Inter','Sarabun',sans-serif" }}>
-      <h2 style={{ color: t.text1, fontSize: 18, fontWeight: 700, marginBottom: "1.5rem" }}>ตั้งค่า</h2>
+      <h2 style={{ color: t.text1, fontSize: 22, fontWeight: 700, marginBottom: "1.5rem" }}>ตั้งค่า</h2>
       <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: 12, padding: "1.25rem" }}>
-        <div style={{ fontWeight: 600, color: t.text1, marginBottom: 4 }}>ภาษา / Language</div>
-        <div style={{ fontSize: 13, color: t.text3, marginBottom: 12 }}>เลือกภาษาที่ใช้แสดงผล UI</div>
+        <div style={{ fontSize: 17, fontWeight: 600, color: t.text1, marginBottom: 4 }}>ภาษา / Language</div>
+        <div style={{ fontSize: 15, color: t.text3, marginBottom: 12 }}>เลือกภาษาที่ใช้แสดงผล UI</div>
         <div style={{ display: "flex", gap: 8 }}>
           {["ภาษาไทย", "English"].map((lang) => (
             <button key={lang} style={{
-              padding: "6px 16px", border: `1.5px solid ${lang === "ภาษาไทย" ? t.accent : t.border}`,
+              padding: "7px 18px", border: `1.5px solid ${lang === "ภาษาไทย" ? t.accent : t.border}`,
               borderRadius: 20, background: lang === "ภาษาไทย" ? t.accentBg : t.surface,
-              color: lang === "ภาษาไทย" ? t.accent : t.text2, fontSize: 13,
+              color: lang === "ภาษาไทย" ? t.accent : t.text2, fontSize: 15,
               cursor: "pointer", fontFamily: "inherit", fontWeight: lang === "ภาษาไทย" ? 600 : 400,
             }}>{lang}</button>
           ))}
         </div>
-        <div style={{ fontSize: 11, color: t.text3, marginTop: 8 }}>* การเปลี่ยนภาษา English จะพร้อมใช้งานในอนาคต</div>
+        <div style={{ fontSize: 13, color: t.text3, marginTop: 8 }}>* การเปลี่ยนภาษา English จะพร้อมใช้งานในอนาคต</div>
       </div>
     </div>
   );
@@ -218,36 +219,47 @@ function SessionEntry({ sess, active, onSelect, onDelete, onRename }) {
   const [renaming, setRenaming] = useState(false);
   const [val, setVal] = useState(sess.name || "");
   const [hovered, setHovered] = useState(false);
+  const [confirming, setConfirming] = useState(false);
 
   return (
-    <div
-      style={{ ...s.sessItem, ...(active ? s.sessActive : {}) }}
-      onClick={onSelect}
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => setHovered(false)}
-    >
-      <div style={{ ...s.sessDot, ...(active ? { background: t.accent } : {}) }} />
-      {renaming ? (
-        <input
-          autoFocus style={s.sessInput}
-          value={val}
-          onChange={(e) => setVal(e.target.value)}
-          onBlur={() => { setRenaming(false); onRename(val.trim() || null); }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") { setRenaming(false); onRename(val.trim() || null); }
-            if (e.key === "Escape") setRenaming(false);
-          }}
-          onClick={(e) => e.stopPropagation()}
+    <>
+      {confirming && (
+        <ConfirmDialog
+          message={`ลบ "${sess.name || "แชทใหม่"}" ?`}
+          confirmLabel="ลบแชท"
+          onConfirm={() => { setConfirming(false); onDelete(); }}
+          onCancel={() => setConfirming(false)}
         />
-      ) : (
-        <span style={s.sessName} onDoubleClick={(e) => { e.stopPropagation(); setRenaming(true); setVal(sess.name || ""); }}>
-          {sess.name || <em style={{ color: t.text3 }}>แชทใหม่</em>}
-        </span>
       )}
-      {hovered && !renaming && (
-        <button style={s.sessDelete} onClick={(e) => { e.stopPropagation(); if (confirm("ลบแชทนี้?")) onDelete(); }}>×</button>
-      )}
-    </div>
+      <div
+        style={{ ...s.sessItem, ...(active ? s.sessActive : {}) }}
+        onClick={onSelect}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+      >
+        <div style={{ ...s.sessDot, ...(active ? { background: t.accent } : {}) }} />
+        {renaming ? (
+          <input
+            autoFocus style={s.sessInput}
+            value={val}
+            onChange={(e) => setVal(e.target.value)}
+            onBlur={() => { setRenaming(false); onRename(val.trim() || null); }}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") { setRenaming(false); onRename(val.trim() || null); }
+              if (e.key === "Escape") setRenaming(false);
+            }}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : (
+          <span style={s.sessName} onDoubleClick={(e) => { e.stopPropagation(); setRenaming(true); setVal(sess.name || ""); }}>
+            {sess.name || <em style={{ color: t.text3 }}>แชทใหม่</em>}
+          </span>
+        )}
+        {hovered && !renaming && (
+          <button style={s.sessDelete} onClick={(e) => { e.stopPropagation(); setConfirming(true); }}>×</button>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -272,47 +284,47 @@ const s = {
   sidebarHidden: { transform: "translateX(-100%)" },
 
   logoRow: { padding: "14px 16px", borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", gap: 10, flexShrink: 0 },
-  logoMark: { width: 34, height: 34, background: t.accent, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 },
-  logoName: { fontSize: 17, fontWeight: 800, color: t.text1, letterSpacing: "-.4px" },
-  logoSub:  { fontSize: 10, color: t.text3 },
-  closeBtn: { marginLeft: "auto", background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 18, padding: 4 },
+  logoMark: { width: 36, height: 36, background: t.accent, borderRadius: 9, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, flexShrink: 0 },
+  logoName: { fontSize: 22, fontWeight: 800, color: t.text1, letterSpacing: "-.4px" },
+  logoSub:  { fontSize: 13, color: t.text3 },
+  closeBtn: { marginLeft: "auto", background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 22, padding: 4 },
 
   navSection: { padding: "10px 0", flexShrink: 0 },
   navItem: {
     display: "flex", alignItems: "center", gap: 10, width: "100%",
-    padding: "8px 14px", fontSize: 14, color: t.text2,
+    padding: "10px 14px", fontSize: 16, color: t.text2,
     background: "transparent", border: "none", borderLeft: "2px solid transparent",
     cursor: "pointer", fontFamily: "inherit", textAlign: "left", transition: "all .12s",
   },
   navActive: { color: t.accent, borderLeftColor: t.accent, background: t.accentLight, fontWeight: 600 },
-  navIcon:   { fontSize: 14, width: 20, textAlign: "center" },
-  navLabel:  { fontSize: 14 },
+  navIcon:   { fontSize: 16, width: 22, textAlign: "center" },
+  navLabel:  { fontSize: 16 },
   navDivider: { height: 1, background: t.border, margin: "6px 14px" },
 
   sessionSection: { display: "flex", flexDirection: "column", flex: 1, overflow: "hidden", padding: "8px 0" },
-  sectionLabel: { fontSize: 10, textTransform: "uppercase", letterSpacing: ".8px", color: t.text3, fontWeight: 600, padding: "0 14px 6px" },
-  newChatBtn: { margin: "0 10px 6px", padding: "7px 12px", background: "transparent", border: `1px dashed ${t.borderMd}`, borderRadius: 8, fontSize: 13, color: t.text3, cursor: "pointer", fontFamily: "inherit", textAlign: "left" },
+  sectionLabel: { fontSize: 12, textTransform: "uppercase", letterSpacing: ".8px", color: t.text3, fontWeight: 600, padding: "0 14px 6px" },
+  newChatBtn: { margin: "0 10px 6px", padding: "8px 12px", background: "transparent", border: `1px dashed ${t.borderMd}`, borderRadius: 8, fontSize: 15, color: t.text3, cursor: "pointer", fontFamily: "inherit", textAlign: "left" },
   sessionList: { flex: 1, overflowY: "auto" },
-  sessItem: { display: "flex", alignItems: "center", gap: 7, padding: "7px 14px", fontSize: 13, color: t.text3, cursor: "pointer", borderLeft: "2px solid transparent", position: "relative" },
+  sessItem: { display: "flex", alignItems: "center", gap: 7, padding: "8px 14px", fontSize: 15, color: t.text3, cursor: "pointer", borderLeft: "2px solid transparent", position: "relative" },
   sessActive: { color: t.text2, borderLeftColor: t.borderMd, background: t.card, fontWeight: 500 },
-  sessDot: { width: 5, height: 5, borderRadius: "50%", background: t.borderMd, flexShrink: 0 },
-  sessName: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 13 },
-  sessDelete: { background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 15, padding: "0 2px", lineHeight: 1 },
-  sessInput: { flex: 1, background: t.card, border: `1px solid ${t.accent}`, borderRadius: 4, color: t.text1, fontSize: 13, padding: "1px 5px", outline: "none", fontFamily: "inherit" },
+  sessDot: { width: 6, height: 6, borderRadius: "50%", background: t.borderMd, flexShrink: 0 },
+  sessName: { flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontSize: 15 },
+  sessDelete: { background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 18, padding: "0 2px", lineHeight: 1 },
+  sessInput: { flex: 1, background: t.card, border: `1px solid ${t.accent}`, borderRadius: 4, color: t.text1, fontSize: 15, padding: "1px 5px", outline: "none", fontFamily: "inherit" },
 
   userRow: { marginTop: "auto", padding: "10px 12px", borderTop: `1px solid ${t.border}`, display: "flex", alignItems: "center", gap: 9, flexShrink: 0 },
-  avatar: { width: 30, height: 30, borderRadius: "50%", background: t.accent, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, fontWeight: 700, flexShrink: 0 },
-  userName: { fontSize: 13, fontWeight: 600, color: t.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-  userRole: { fontSize: 10, color: t.text3 },
-  signOutBtn: { background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 15, padding: "2px 4px", flexShrink: 0 },
+  avatar: { width: 34, height: 34, borderRadius: "50%", background: t.accent, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15, fontWeight: 700, flexShrink: 0 },
+  userName: { fontSize: 15, fontWeight: 600, color: t.text1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+  userRole: { fontSize: 12, color: t.text3 },
+  signOutBtn: { background: "none", border: "none", color: t.text3, cursor: "pointer", fontSize: 18, padding: "2px 4px", flexShrink: 0 },
 
-  mainWrap: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", height: "100%" },
+  mainWrap: { flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", minHeight: 0 },
 
-  mobileTopBar: { height: 52, background: t.surface, borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", padding: "0 12px", gap: 10, flexShrink: 0, zIndex: 10 },
-  hamburger: { width: 36, height: 36, background: "none", border: "none", fontSize: 20, cursor: "pointer", color: t.text1, display: "flex", alignItems: "center", justifyContent: "center" },
-  mobileTitle: { flex: 1, textAlign: "center", fontSize: 16, fontWeight: 700, color: t.text1 },
+  mobileTopBar: { height: 56, background: t.surface, borderBottom: `1px solid ${t.border}`, display: "flex", alignItems: "center", padding: "0 12px", gap: 10, flexShrink: 0, zIndex: 10 },
+  hamburger: { width: 40, height: 40, background: "none", border: "none", fontSize: 24, cursor: "pointer", color: t.text1, display: "flex", alignItems: "center", justifyContent: "center" },
+  mobileTitle: { flex: 1, textAlign: "center", fontSize: 20, fontWeight: 700, color: t.text1 },
 
-  bottomNav: { height: 60, background: t.surface, borderTop: `1px solid ${t.border}`, display: "flex", flexShrink: 0, zIndex: 100 },
+  bottomNav: { height: 64, background: t.surface, borderTop: `1px solid ${t.border}`, display: "flex", flexShrink: 0, zIndex: 100 },
   bottomNavItem: { flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 2, background: "none", border: "none", cursor: "pointer", color: t.text3, fontFamily: "inherit", padding: 0 },
   bottomNavActive: { color: t.accent },
 };
