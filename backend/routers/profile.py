@@ -9,7 +9,8 @@ from __future__ import annotations
 
 from datetime import date
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Any
+import json
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -17,6 +18,7 @@ from pydantic import BaseModel, Field, field_validator
 
 from auth.firebase_admin import get_current_user
 from db.postgres import execute, fetch, fetchrow
+from engines.recommendation_engine import recommend_majors
 
 router = APIRouter()
 
@@ -85,6 +87,31 @@ class ProfileResponse(BaseModel):
     gpax: Optional[float]
     test_scores: list[TestScoreOut]
 
+
+class RecommendedCareerOut(BaseModel):
+    id: UUID
+    title: str
+    overview_description: Optional[str]
+    avg_salary_thb: Optional[int]
+    active_job_openings: Optional[int]
+    responsibilities: Any = []
+    education_requirements: Any = []
+    top_skills: Any = []
+    match_score: Optional[float]
+    ai_reasoning: Optional[str]
+
+class CareersResponse(BaseModel):
+    careers: list[RecommendedCareerOut]
+
+class RecommendedMajorOut(BaseModel):
+    major_name: str
+    faculty_name: str
+    university_name: str
+    project_name: str
+    fit_score: float
+
+class MajorsResponse(BaseModel):
+    recommendations: list[RecommendedMajorOut]
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
@@ -190,3 +217,65 @@ async def update_profile(
             )
 
     return await get_profile(user=user)
+
+@router.get(
+    "/careers",
+    response_model=CareersResponse,
+    summary="Get user's recommended career paths",
+)
+async def get_recommended_careers(user: dict = Depends(get_current_user)):
+    user_id: UUID = user["id"]
+    
+    query = """
+        SELECT 
+            c.id,
+            c.title,
+            c.overview_description,
+            c.avg_salary_thb,
+            c.active_job_openings,
+            c.responsibilities,
+            c.education_requirements,
+            c.top_skills,
+            urc.match_score,
+            urc.ai_reasoning
+        FROM user_recommended_careers urc
+        JOIN career_catalog c ON urc.career_id = c.id
+        WHERE urc.user_id = $1
+        ORDER BY urc.match_score DESC NULLS LAST
+    """
+    rows = await fetch(query, user_id)
+    
+    results = []
+    for r in rows:
+        d = dict(r)
+        
+        # Parse JSONB fields if asyncpg returned them as strings
+        for field in ["responsibilities", "education_requirements", "top_skills"]:
+            val = d.get(field)
+            if isinstance(val, str):
+                try:
+                    d[field] = json.loads(val)
+                except Exception:
+                    d[field] = []
+            elif not val:
+                d[field] = []
+                
+        results.append(RecommendedCareerOut(**d))
+        
+    return CareersResponse(careers=results)
+
+@router.get(
+    "/recommendations",
+    response_model=MajorsResponse,
+    summary="Get user's recommended majors",
+)
+async def get_recommended_majors(user: dict = Depends(get_current_user)):
+    user_id: UUID = user["id"]
+    
+    # Fetch test scores from DB
+    scores_rows = await fetch("SELECT subject, score FROM user_test_scores WHERE user_id = $1", user_id)
+    user_scores = {row["subject"]: float(row["score"]) for row in scores_rows}
+    
+    results = await recommend_majors(user_id=user_id, scores=user_scores)
+    
+    return MajorsResponse(recommendations=results)
