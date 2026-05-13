@@ -172,7 +172,11 @@ export default function EligibilityOverview({ results, getToken }) {
                   <LineChart data={multiLineData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                     <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-                    <YAxis tick={{ fontSize: 11 }} width={60} tickFormatter={(v) => v?.toLocaleString()} />
+                    <YAxis
+                      tick={{ fontSize: 11 }} width={65}
+                      tickFormatter={(v) => v?.toLocaleString()}
+                      domain={[(dataMin) => Math.max(0, Math.floor(dataMin * 0.92 / 100) * 100), (dataMax) => Math.ceil(dataMax * 1.05 / 100) * 100]}
+                    />
                     <Tooltip content={<CustomTooltip />} />
                     <Legend
                       wrapperStyle={{ fontSize: 11, paddingTop: 8 }}
@@ -192,7 +196,38 @@ export default function EligibilityOverview({ results, getToken }) {
                     ))}
                   </LineChart>
                 </ResponsiveContainer>
-                <div style={s.note}>เส้นประ = แนวโน้มที่คาดการณ์ปีถัดไป | แต่ละสีแทนหนึ่งโครงการ</div>
+                <div style={s.note}>แต่ละสีแทนหนึ่งโครงการ | เส้นประแดง = คาดการณ์ปีถัดไป</div>
+
+                {/* Applicant count comparison */}
+                {Object.keys(trendData || {}).length > 0 && (() => {
+                  const appData = multiLineData.map((row) => {
+                    const r = { year: row.year };
+                    Object.entries(trendData).forEach(([id, cuts]) => {
+                      const match = cuts.find((c) => c.year === row.year);
+                      r[id] = match?.applicants_count ?? null;
+                    });
+                    return r;
+                  }).filter((r) => Object.entries(r).some(([k, v]) => k !== "year" && v != null));
+                  return appData.length ? (
+                    <>
+                      <div style={{ ...s.chartTitle, marginTop: 16 }}>เปรียบเทียบจำนวนผู้สมัครต่อปี</div>
+                      <ResponsiveContainer width="100%" height={200}>
+                        <LineChart data={appData} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                          <XAxis dataKey="year" tick={{ fontSize: 12 }} />
+                          <YAxis tick={{ fontSize: 11 }} width={60} tickFormatter={(v) => v?.toLocaleString()}
+                            domain={[0, (dataMax) => Math.ceil(dataMax * 1.1 / 10) * 10]} />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Legend wrapperStyle={{ fontSize: 11 }} formatter={(value) => programLabels[value] || value} />
+                          {Object.keys(trendData).map((id, i) => (
+                            <Line key={id} type="monotone" dataKey={id} name={id}
+                              stroke={PALETTE[i % PALETTE.length]} strokeWidth={2} dot={{ r: 3 }} connectNulls={false} />
+                          ))}
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </>
+                  ) : null;
+                })()}
               </>
             )}
           </div>
