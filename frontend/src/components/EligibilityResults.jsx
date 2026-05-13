@@ -19,6 +19,23 @@ function groupBy(items, key) {
   return Object.entries(map).sort(([a], [b]) => a.localeCompare(b, "th"));
 }
 
+function groupByMajor(items) {
+  // Group projects under their parent major (major_id)
+  const map = {};
+  for (const item of items) {
+    const key = item.major_id || item.major;
+    if (!map[key]) map[key] = { major: item.major, faculty: item.faculty, university: item.university, major_id: item.major_id, projects: [] };
+    map[key].projects.push(item);
+  }
+  // Sort: majors with eligible projects first, then alphabetically
+  return Object.values(map).sort((a, b) => {
+    const aElig = a.projects.some((p) => p.eligible) ? 0 : 1;
+    const bElig = b.projects.some((p) => p.eligible) ? 0 : 1;
+    if (aElig !== bElig) return aElig - bElig;
+    return a.major.localeCompare(b.major, "th");
+  });
+}
+
 export default function EligibilityResults({ getToken }) {
   const [results, setResults] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -81,32 +98,25 @@ export default function EligibilityResults({ getToken }) {
             </span>
           </div>
 
-          {/* Filter + Group controls */}
           <div style={cs.controls}>
             <div style={cs.controlGroup}>
               <span style={cs.controlLabel}>แสดง:</span>
               {[["all", "ทั้งหมด"], ["eligible", "ผ่านเกณฑ์"], ["ineligible", "ไม่ผ่าน"]].map(([v, l]) => (
                 <button key={v} onClick={() => setFilter(v)}
-                  style={{ ...cs.pill, ...(filter === v ? cs.pillActive : {}) }}>
-                  {l}
-                </button>
+                  style={{ ...cs.pill, ...(filter === v ? cs.pillActive : {}) }}>{l}</button>
               ))}
             </div>
             <div style={cs.controlGroup}>
               <span style={cs.controlLabel}>จัดกลุ่มตาม:</span>
               {GROUP_OPTIONS.map(({ key, label }) => (
                 <button key={key} onClick={() => setGroupKey(key)}
-                  style={{ ...cs.pill, ...(groupKey === key ? cs.pillActive : {}) }}>
-                  {label}
-                </button>
+                  style={{ ...cs.pill, ...(groupKey === key ? cs.pillActive : {}) }}>{label}</button>
               ))}
             </div>
           </div>
 
-          {/* Overview dashboard */}
           <EligibilityOverview results={results.results} getToken={getToken} />
 
-          {/* Grouped results */}
           {filtered.length === 0 ? (
             <p style={cs.empty}>ไม่มีโครงการในหมวดนี้</p>
           ) : (
@@ -129,6 +139,7 @@ export default function EligibilityResults({ getToken }) {
 function GroupSection({ name, items, getToken, defaultOpen }) {
   const [open, setOpen] = useState(defaultOpen);
   const eligibleCount = items.filter((r) => r.eligible).length;
+  const majorGroups = groupByMajor(items);
 
   return (
     <div style={gs.section}>
@@ -136,15 +147,15 @@ function GroupSection({ name, items, getToken, defaultOpen }) {
         <div style={gs.headerLeft}>
           <span style={gs.groupName}>{name}</span>
           <span style={{ ...gs.count, color: eligibleCount > 0 ? "#0a7" : "#c33" }}>
-            ผ่านเกณฑ์ {eligibleCount}/{items.length}
+            ผ่านเกณฑ์ {eligibleCount}/{items.length} โครงการ · {majorGroups.length} หลักสูตร
           </span>
         </div>
         <span style={gs.toggle}>{open ? "▲" : "▼"}</span>
       </div>
       {open && (
         <div style={gs.body}>
-          {items.map((r) => (
-            <ProjectCard key={r.admission_project_id} result={r} getToken={getToken} />
+          {majorGroups.map((mg) => (
+            <MajorCard key={mg.major_id || mg.major} majorGroup={mg} getToken={getToken} />
           ))}
         </div>
       )}
@@ -152,76 +163,96 @@ function GroupSection({ name, items, getToken, defaultOpen }) {
   );
 }
 
-export function ProjectCard({ result, getToken }) {
+function MajorCard({ majorGroup, getToken }) {
   const [open, setOpen] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
-  const borderColor = result.eligible ? "#0a7" : "#c33";
+  const { major, faculty, major_id, projects } = majorGroup;
+  const eligibleCount = projects.filter((p) => p.eligible).length;
+  const allEligible = eligibleCount === projects.length;
+  const anyEligible = eligibleCount > 0;
+  const headerColor = allEligible ? "#0a7" : anyEligible ? "#e6a817" : "#c33";
 
   async function handleSave(e) {
     e.stopPropagation();
-    if (!result.major_id || saving || saved) return;
+    if (!major_id || saving || saved) return;
     setSaving(true);
     try {
       const token = await getToken();
       const res = await fetch("/api/profile/saved-majors", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ major_id: result.major_id }),
+        body: JSON.stringify({ major_id }),
       });
       if (res.ok) setSaved(true);
     } finally { setSaving(false); }
   }
 
   return (
-    <div style={{ ...styles.card, borderLeft: `4px solid ${borderColor}` }}>
-      <div style={styles.cardHeader} onClick={() => setOpen(!open)}>
-        <div style={{ flex: 1 }}>
-          <div style={styles.topRow}>
-            <span style={{ ...styles.eligibleBadge, background: borderColor }}>
-              {result.eligible ? "ผ่านเกณฑ์" : "ไม่ผ่านเกณฑ์"}
+    <div style={{ ...mc.card, borderLeft: `4px solid ${headerColor}` }}>
+      {/* Major header — click to expand */}
+      <div style={mc.header} onClick={() => setOpen(!open)}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={mc.majorName}>{major}</div>
+          <div style={mc.meta}>
+            {faculty}
+            <span style={mc.dot}>·</span>
+            <span style={{ ...mc.eligCount, color: headerColor }}>
+              {eligibleCount}/{projects.length} โครงการผ่านเกณฑ์
             </span>
-            <strong style={styles.projectName}>{result.project_name}</strong>
-          </div>
-          <div style={styles.location}>
-            {result.university} › {result.faculty} › {result.major}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-          {result.major_id && getToken && (
-            <button
-              onClick={handleSave}
-              disabled={saving || saved}
-              style={{
-                padding: "4px 10px", border: "1.5px solid", borderRadius: 20, fontSize: "0.78rem",
-                cursor: saved ? "default" : "pointer", fontWeight: 600, whiteSpace: "nowrap",
-                borderColor: saved ? "#0a7" : "#0f3460",
-                color: saved ? "#0a7" : "#0f3460", background: "#fff",
-              }}
-            >
+          {major_id && getToken && (
+            <button onClick={handleSave} disabled={saving || saved} style={{
+              padding: "3px 10px", border: "1.5px solid", borderRadius: 20, fontSize: "0.75rem",
+              cursor: saved ? "default" : "pointer", fontWeight: 600, whiteSpace: "nowrap",
+              borderColor: saved ? "#0a7" : "#0f3460",
+              color: saved ? "#0a7" : "#0f3460", background: "#fff",
+            }}>
               {saved ? "✓ บันทึก" : saving ? "..." : "บันทึก"}
             </button>
           )}
-          <span style={styles.toggle}>{open ? "▲" : "▼"}</span>
+          <span style={mc.toggle}>{open ? "▲" : "▼"}</span>
         </div>
       </div>
 
+      {/* Project rows — shown when expanded */}
       {open && (
-        <div style={styles.cardBody}>
-          <div style={styles.row}>
-            <span style={styles.key}>GPAX ขั้นต่ำ</span>
-            <span style={result.gpax_ok ? styles.pass : styles.fail}>
-              {result.gpax_min != null ? result.gpax_min.toFixed(2) : "ไม่กำหนด"}
-              {!result.gpax_ok && " (ไม่ผ่าน)"}
-            </span>
-          </div>
-          {result.seats && (
-            <div style={styles.row}>
-              <span style={styles.key}>จำนวนรับ</span>
-              <span>{result.seats} คน</span>
-            </div>
-          )}
+        <div style={mc.projectList}>
+          {projects.map((p) => (
+            <ProjectRow key={p.admission_project_id} result={p} getToken={getToken} />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
+function ProjectRow({ result, getToken }) {
+  const [open, setOpen] = useState(false);
+  const borderColor = result.eligible ? "#0a7" : "#c33";
+
+  return (
+    <div style={pr.row}>
+      {/* Project summary line — click to expand details */}
+      <div style={pr.summary} onClick={() => setOpen(!open)}>
+        <span style={{ ...pr.badge, background: borderColor }}>
+          {result.eligible ? "ผ่าน" : "ไม่ผ่าน"}
+        </span>
+        <span style={pr.projectName}>{result.project_name}</span>
+        <div style={pr.rightMeta}>
+          {result.gpax_min != null && (
+            <span style={pr.gpaxTag}>GPAX ≥ {result.gpax_min.toFixed(2)}</span>
+          )}
+          {result.seats && <span style={pr.seatsTag}>{result.seats} ที่นั่ง</span>}
+          <span style={pr.toggle}>{open ? "▲" : "▼"}</span>
+        </div>
+      </div>
+
+      {/* Expanded details */}
+      {open && (
+        <div style={pr.details}>
           {result.subject_results.length > 0 && (
             <>
               <div style={styles.subHeading}>วิชาที่ใช้</div>
@@ -252,10 +283,7 @@ export function ProjectCard({ result, getToken }) {
             </>
           )}
 
-          <CutoffChart
-            admissionProjectId={result.admission_project_id}
-            getToken={getToken}
-          />
+          <CutoffChart admissionProjectId={result.admission_project_id} getToken={getToken} />
 
           {result.source_url && (
             <a href={result.source_url} target="_blank" rel="noreferrer" style={styles.link}>
@@ -266,6 +294,11 @@ export function ProjectCard({ result, getToken }) {
       )}
     </div>
   );
+}
+
+// Legacy export for any other file that imports ProjectCard directly
+export function ProjectCard({ result, getToken }) {
+  return <ProjectRow result={result} getToken={getToken} />;
 }
 
 const cs = {
@@ -282,10 +315,7 @@ const cs = {
   controls: { display: "flex", flexDirection: "column", gap: 8, marginBottom: "1.25rem" },
   controlGroup: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" },
   controlLabel: { fontSize: "0.82rem", color: "#666", minWidth: 90 },
-  pill: {
-    border: "1px solid #ccc", borderRadius: 20, padding: "0.2rem 0.7rem",
-    cursor: "pointer", background: "#fff", fontSize: "0.82rem", color: "#555",
-  },
+  pill: { border: "1px solid #ccc", borderRadius: 20, padding: "0.2rem 0.7rem", cursor: "pointer", background: "#fff", fontSize: "0.82rem", color: "#555" },
   pillActive: { background: "#0f3460", color: "#fff", border: "1px solid #0f3460" },
   empty: { color: "#888", textAlign: "center", padding: "2rem" },
 };
@@ -294,35 +324,56 @@ const gs = {
   section: { marginBottom: "0.75rem", border: "1px solid #dde", borderRadius: 10, overflow: "hidden" },
   header: {
     display: "flex", justifyContent: "space-between", alignItems: "center",
-    padding: "0.75rem 1rem", cursor: "pointer",
-    background: "#f0f4ff", userSelect: "none",
+    padding: "0.75rem 1rem", cursor: "pointer", background: "#f0f4ff", userSelect: "none",
   },
-  headerLeft: { display: "flex", alignItems: "center", gap: 10 },
+  headerLeft: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" },
   groupName: { fontWeight: 700, color: "#1a1a2e", fontSize: "0.95rem" },
   count: { fontSize: "0.82rem", fontWeight: 600 },
   toggle: { color: "#888", fontSize: "0.9rem" },
   body: { padding: "0.5rem 0.75rem" },
 };
 
-const styles = {
-  card: { border: "1px solid #e8e8e8", borderRadius: 8, marginBottom: "0.5rem", overflow: "hidden", background: "#fff" },
-  cardHeader: {
-    display: "flex", justifyContent: "space-between", alignItems: "flex-start",
-    padding: "0.65rem 0.9rem", cursor: "pointer", background: "#fafafa", gap: 8,
+const mc = {
+  card: {
+    border: "1px solid #e8e8e8", borderRadius: 8, marginBottom: "0.5rem",
+    overflow: "hidden", background: "#fff",
   },
-  topRow: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", marginBottom: 2 },
-  cardBody: { padding: "0.75rem 0.9rem", borderTop: "1px solid #eee" },
-  projectName: { fontSize: "0.95rem" },
-  location: { color: "#666", fontSize: "0.82rem" },
-  eligibleBadge: { color: "#fff", borderRadius: 12, padding: "0.1rem 0.5rem", fontSize: "0.72rem", whiteSpace: "nowrap" },
-  toggle: { color: "#888" },
-  row: { display: "flex", gap: "1rem", marginBottom: "0.4rem", fontSize: "0.9rem" },
-  key: { color: "#555", minWidth: 120 },
-  subHeading: { fontWeight: 600, margin: "0.75rem 0 0.35rem", fontSize: "0.9rem" },
-  table: { width: "100%", borderCollapse: "collapse", fontSize: "0.85rem" },
+  header: {
+    display: "flex", alignItems: "center", gap: 10,
+    padding: "0.75rem 1rem", cursor: "pointer", background: "#fafafa",
+  },
+  majorName: { fontWeight: 700, color: "#1a1a2e", fontSize: "0.95rem", marginBottom: 2 },
+  meta: { display: "flex", alignItems: "center", gap: 6, fontSize: "0.82rem", color: "#666", flexWrap: "wrap" },
+  dot: { color: "#ccc" },
+  eligCount: { fontWeight: 600 },
+  toggle: { color: "#888", fontSize: "0.85rem" },
+  projectList: { borderTop: "1px solid #f0f0f0" },
+};
+
+const pr = {
+  row: { borderBottom: "1px solid #f5f5f5" },
+  summary: {
+    display: "flex", alignItems: "center", gap: 8, padding: "0.55rem 1rem",
+    cursor: "pointer", background: "#fff", flexWrap: "wrap",
+  },
+  badge: {
+    color: "#fff", borderRadius: 10, padding: "0.1rem 0.45rem",
+    fontSize: "0.7rem", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0,
+  },
+  projectName: { flex: 1, fontSize: "0.88rem", color: "#333", minWidth: 0 },
+  rightMeta: { display: "flex", alignItems: "center", gap: 6, flexShrink: 0 },
+  gpaxTag: { fontSize: "0.75rem", color: "#888", background: "#f5f5f5", padding: "1px 6px", borderRadius: 8 },
+  seatsTag: { fontSize: "0.75rem", color: "#888" },
+  toggle: { color: "#aaa", fontSize: "0.8rem" },
+  details: { padding: "0.75rem 1rem", background: "#fafafa", borderTop: "1px solid #eee" },
+};
+
+const styles = {
+  subHeading: { fontWeight: 600, margin: "0.5rem 0 0.35rem", fontSize: "0.88rem", color: "#333" },
+  table: { width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" },
   th: { textAlign: "left", padding: "0.3rem 0.5rem", borderBottom: "1px solid #ddd", color: "#555" },
   td: { padding: "0.3rem 0.5rem", borderBottom: "1px solid #f0f0f0" },
   pass: { color: "#0a7", fontWeight: 600 },
   fail: { color: "#c33", fontWeight: 600 },
-  link: { color: "#0f3460", fontSize: "0.85rem", display: "inline-block", marginTop: "0.5rem" },
+  link: { color: "#0f3460", fontSize: "0.82rem", display: "inline-block", marginTop: "0.5rem" },
 };
