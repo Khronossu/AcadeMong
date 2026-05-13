@@ -1,5 +1,6 @@
 import { useState } from "react";
 import CutoffChart from "./CutoffChart";
+import EligibilityOverview from "./EligibilityOverview";
 
 const GROUP_OPTIONS = [
   { key: "university", label: "มหาวิทยาลัย" },
@@ -101,6 +102,9 @@ export default function EligibilityResults({ getToken }) {
               ))}
             </div>
           </div>
+
+          {/* Overview dashboard */}
+          <EligibilityOverview results={results.results} getToken={getToken} />
 
           {/* Grouped results */}
           {filtered.length === 0 ? (

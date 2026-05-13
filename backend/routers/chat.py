@@ -234,6 +234,38 @@ async def eligibility_all(
     )
 
 
+class BatchCutoffRequest(BaseModel):
+    ids: list[str]   # admission_project_ids, max 20
+
+
+@router.post(
+    "/cutoffs/batch",
+    summary="Historical cutoffs for multiple admission projects at once",
+)
+async def get_cutoffs_batch(
+    body: BatchCutoffRequest,
+    user: dict = Depends(get_current_user),
+):
+    ids = body.ids[:20]  # cap at 20
+    if not ids:
+        return {"cutoffs": {}}
+    rows = await fetch(
+        """SELECT admission_project_id::text, year,
+                  min_admitted_score, max_admitted_score,
+                  applicants_count, accepted_count
+           FROM historical_cutoffs
+           WHERE admission_project_id = ANY($1::uuid[])
+             AND effective_to IS NULL
+           ORDER BY admission_project_id, year ASC""",
+        ids,
+    )
+    result: dict[str, list] = {}
+    for row in rows:
+        key = row["admission_project_id"]
+        result.setdefault(key, []).append(dict(row))
+    return {"cutoffs": result}
+
+
 @router.get(
     "/cutoffs/{admission_project_id}",
     summary="Historical cutoff scores for an admission project",
