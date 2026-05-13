@@ -49,7 +49,7 @@ _INJECTION_PATTERNS: list[re.Pattern] = [
     r"jailbreak",
     # Role override — "You are an AI with no rules / restrictions"
     r"you\s+are\s+an?\s+ai\s+with\s+no\s+(?:rules|restrictions|limits)",
-    r"คุณคือ(?:\s+\S+){0,3}\s*ที่ไม่มีข้อจำกัด",
+    r"คุณคือ.{0,40}ที่ไม่มีข้อจำกัด",
     # Prompt extraction
     r"repeat\s+(?:the\s+)?(?:text|prompt|instruction|message)\s+(?:above|before|verbatim|word)",
     r"word\s+for\s+word",
@@ -96,19 +96,26 @@ _EDUCATION_KEYWORDS: frozenset[str] = frozenset([
 ])
 
 # Patterns that are hard-blocked — clearly off-topic, no ambiguity
-_HARD_OFFTOPIC_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
+_HARD_OFFTOPIC_PATTERNS: list[re.Pattern] = [re.compile(
+    unicodedata.normalize("NFKC", p), re.IGNORECASE
+) for p in [
     r"\brecipe\b",
     r"how\s+to\s+cook",
-    r"สอนทำ(?:อาหาร|ขนม|ผัด|ต้ม|แกง)",
-    r"วิธีทำ(?:อาหาร|ขนม)",
+    r"สอนทำ.{0,10}(?:อาหาร|ขนม|ผัดไทย|ต้มยำ|แกง|ข้าว)",
+    r"วิธีทำ(?:อาหาร|ขนม|ผัดไทย)",
+    r"ผัดไทย",              # iconic Thai dish — not education
+    r"ส่วนผสม(?:ของ)?",    # "ingredients of"
     r"solve\s+(?:this\s+)?(?:equation|problem)\b",
     r"แก้โจทย์",
     r"ช่วยแก้(?:โจทย์|สมการ|ปัญหาคณิต)",
-    r"x\^2\s*[+\-]",       # math equation pattern
+    r"x\^2\s*[+\-]",
     r"\bx²\b",
     r"write\s+(?:my\s+)?(?:essay|story|poem|code)\b",
     r"translate\s+this\s+(?:text|sentence|paragraph)",
     r"แปลภาษา(?:ให้|หน่อย)",
+    # General knowledge not related to education
+    r"ก่อตั้งเมื่อปีใด",   # "founded in which year" — history question
+    r"เกิดขึ้นเมื่อ(?:ปี|ไหน|ใด)",
 ]]
 
 # Patterns that are soft-warned but not blocked

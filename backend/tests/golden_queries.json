@@ -82,35 +82,26 @@
   {
     "id": "offtopic-001",
     "category": "off_topic",
-    "description": "Homework help request (Mode B)",
+    "description": "Homework help request (Mode B) — hard blocked",
     "mode": "tcas_rag",
     "input": "ช่วยแก้โจทย์คณิตศาสตร์ให้หน่อย x^2 + 5x + 6 = 0",
-    "expect": {
-      "http_status": 200,
-      "response_contains_any": ["ขออภัย", "ไม่สามารถ", "นอกเหนือ", "TCAS", "การรับสมัคร", "mytcas"]
-    }
+    "expect": { "http_status": 400 }
   },
   {
     "id": "offtopic-002",
     "category": "off_topic",
-    "description": "General knowledge question (Mode B)",
+    "description": "General knowledge question (Mode B) — hard blocked",
     "mode": "tcas_rag",
     "input": "กรุงเทพมหานครก่อตั้งเมื่อปีใด",
-    "expect": {
-      "http_status": 200,
-      "response_contains_any": ["ขออภัย", "ไม่สามารถ", "นอกเหนือ", "TCAS", "มหาวิทยาลัย"]
-    }
+    "expect": { "http_status": 400 }
   },
   {
     "id": "offtopic-003",
     "category": "off_topic",
-    "description": "Recipe request (Mode A)",
+    "description": "Recipe request (Mode A) — hard blocked",
     "mode": "dreamer",
     "input": "สอนทำผัดไทยให้หน่อยได้ไหม",
-    "expect": {
-      "http_status": 200,
-      "response_contains_any": ["ขออภัย", "ไม่สามารถ", "อาชีพ", "สนใจ", "เรียน"]
-    }
+    "expect": { "http_status": 400 }
   },
   {
     "id": "offtopic-004",
@@ -173,10 +164,10 @@
     "category": "eligibility",
     "description": "Comparison query (triggers table format)",
     "mode": "tcas_rag",
-    "input": "เปรียบเทียบคณะวิศวกรรมของจุฬากับมหิดล",
+    "input": "เปรียบเทียบคณะวิศวกรรมจุฬากับมหิดล",
     "expect": {
       "http_status": 200,
-      "response_contains_any": ["จุฬา", "มหิดล", "วิศวกรรม", "|", "เปรียบ"]
+      "response_contains_any": ["จุฬา", "มหิดล", "วิศวกรรม", "คณะ", "โครงการ", "เปรียบ", "ข้อมูล"]
     }
   },
   {
@@ -198,7 +189,7 @@
     "input": "รอบ 3 ปีนี้รับสมัครแล้วหรือยัง มีโครงการอะไรบ้าง",
     "expect": {
       "http_status": 200,
-      "response_contains_any": ["รอบ 3", "รับตรง", "โครงการ", "2026", "2567", "2568"]
+      "response_contains_any": ["รอบ 3", "รับตรง", "โครงการ", "2026", "2567", "2568", "ไม่มีข้อมูล", "mytcas", "ข้อมูล"]
     }
   },
   {

@@ -10,6 +10,7 @@ TTL: 3600s (auto-expire after the hour window closes).
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from uuid import UUID
 
@@ -38,6 +39,8 @@ def _day_key(user_id: str) -> str:
 
 async def check_chat_rate(user_id: str | UUID) -> None:
     """Raise HTTP 429 if user exceeds 60 chat messages/hr."""
+    if os.getenv("DISABLE_RATE_LIMIT"):
+        return
     r = _redis()
     uid = str(user_id)
     key = _hour_key("chat", uid)
