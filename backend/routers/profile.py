@@ -190,3 +190,67 @@ async def update_profile(
             )
 
     return await get_profile(user=user)
+
+
+# ── Saved majors ──────────────────────────────────────────────────────────────
+
+class SaveMajorRequest(BaseModel):
+    major_id: UUID
+    notes: Optional[str] = None
+
+
+@router.get("/saved-majors", summary="List saved majors")
+async def list_saved_majors(user: dict = Depends(get_current_user)):
+    rows = await fetch(
+        """SELECT sm.major_id, sm.notes, sm.saved_at,
+                  m.name AS major_name,
+                  f.name AS faculty_name,
+                  u.name AS university_name
+           FROM user_saved_majors sm
+           JOIN majors m ON m.id = sm.major_id
+           JOIN faculties f ON f.id = m.faculty_id
+           JOIN universities u ON u.id = f.university_id
+           WHERE sm.user_id = $1
+           ORDER BY sm.saved_at DESC""",
+        user["id"],
+    )
+    return {"saved_majors": [dict(r) for r in rows]}
+
+
+@router.post("/saved-majors", summary="Save a major", status_code=201)
+async def save_major(req: SaveMajorRequest, user: dict = Depends(get_current_user)):
+    await execute(
+        """INSERT INTO user_saved_majors (user_id, major_id, notes)
+           VALUES ($1, $2, $3)
+           ON CONFLICT (user_id, major_id) DO UPDATE SET notes = EXCLUDED.notes""",
+        user["id"], req.major_id, req.notes,
+    )
+    return {"ok": True}
+
+
+@router.delete("/saved-majors/{major_id}", summary="Remove a saved major")
+async def remove_saved_major(major_id: UUID, user: dict = Depends(get_current_user)):
+    await execute(
+        "DELETE FROM user_saved_majors WHERE user_id = $1 AND major_id = $2",
+        user["id"], major_id,
+    )
+    return {"ok": True}
+
+
+# ── Career recommendations ────────────────────────────────────────────────────
+
+@router.get("/career-recommendations", summary="Get AI career recommendations")
+async def get_career_recommendations(user: dict = Depends(get_current_user)):
+    rows = await fetch(
+        """SELECT cc.title, cc.overview_description, cc.avg_salary_thb,
+                  cc.top_skills, ig.name AS industry_group,
+                  urc.match_score, urc.ai_reasoning, urc.created_at
+           FROM user_recommended_careers urc
+           JOIN career_catalog cc ON cc.id = urc.career_id
+           LEFT JOIN industry_groups ig ON ig.id = cc.industry_group_id
+           WHERE urc.user_id = $1
+           ORDER BY urc.match_score DESC
+           LIMIT 10""",
+        user["id"],
+    )
+    return {"recommendations": [dict(r) for r in rows]}

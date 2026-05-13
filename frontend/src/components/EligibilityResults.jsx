@@ -75,7 +75,7 @@ export default function EligibilityResults({ getToken }) {
 
           <div>
             {shown.map((r) => (
-              <ProjectCard key={r.admission_project_id} result={r} />
+              <ProjectCard key={r.admission_project_id} result={r} getToken={getToken} />
             ))}
             {shown.length === 0 && (
               <p style={containerStyles.empty}>ไม่มีโครงการในหมวดนี้</p>
@@ -110,9 +110,26 @@ const containerStyles = {
   empty: { color: "#888", textAlign: "center", padding: "2rem" },
 };
 
-export function ProjectCard({ result }) {
+export function ProjectCard({ result, getToken }) {
   const [open, setOpen] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
   const borderColor = result.eligible ? "#0a7" : "#c33";
+
+  async function handleSave(e) {
+    e.stopPropagation();
+    if (!result.major_id || saving || saved) return;
+    setSaving(true);
+    try {
+      const token = await getToken();
+      const res = await fetch("/api/profile/saved-majors", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ major_id: result.major_id }),
+      });
+      if (res.ok) setSaved(true);
+    } finally { setSaving(false); }
+  }
 
   return (
     <div style={{ ...styles.card, borderLeft: `4px solid ${borderColor}` }}>
@@ -126,7 +143,23 @@ export function ProjectCard({ result }) {
             {result.university} › {result.faculty} › {result.major}
           </div>
         </div>
-        <span style={styles.toggle}>{open ? "▲" : "▼"}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {result.major_id && getToken && (
+            <button
+              onClick={handleSave}
+              disabled={saving || saved}
+              style={{
+                padding: "4px 10px", border: "1.5px solid", borderRadius: 20, fontSize: "0.78rem",
+                cursor: saved ? "default" : "pointer", fontWeight: 600,
+                borderColor: saved ? "#0a7" : "#0f3460",
+                color: saved ? "#0a7" : "#0f3460", background: "#fff",
+              }}
+            >
+              {saved ? "✓ บันทึกแล้ว" : saving ? "..." : "บันทึก"}
+            </button>
+          )}
+          <span style={styles.toggle}>{open ? "▲" : "▼"}</span>
+        </div>
       </div>
 
       {open && (

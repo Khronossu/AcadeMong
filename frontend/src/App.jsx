@@ -3,11 +3,13 @@ import AuthGate from "./components/AuthGate";
 import ProfileForm from "./components/ProfileForm";
 import EligibilityResults from "./components/EligibilityResults";
 import ChatInterface from "./components/ChatInterface";
+import CareerPathView from "./components/CareerPathView";
 
 const TABS = [
   { key: "chat",        label: "แชทกับ AI" },
   { key: "profile",     label: "โปรไฟล์" },
   { key: "eligibility", label: "ตรวจสอบคุณสมบัติ" },
+  { key: "careers",     label: "อาชีพแนะนำ" },
 ];
 
 function AppContent({ getToken, username, signOut }) {
@@ -46,11 +48,8 @@ function AppContent({ getToken, username, signOut }) {
         {tab === "profile" && (
           <ProfileForm getToken={getToken} onSaved={() => setProfileSaved(true)} />
         )}
-        {tab === "eligibility" && (
-          profileSaved
-            ? <EligibilityResults getToken={getToken} />
-            : <EligibilityResults getToken={getToken} />
-        )}
+        {tab === "eligibility" && <EligibilityResults getToken={getToken} />}
+        {tab === "careers"     && <CareerPathView getToken={getToken} />}
       </main>
     </div>
   );

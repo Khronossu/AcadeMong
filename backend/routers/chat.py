@@ -81,6 +81,7 @@ class SubjectResult(BaseModel):
 
 class EligibilityResult(BaseModel):
     admission_project_id: str
+    major_id: Optional[str] = None
     project_name: str
     major: str
     faculty: str
@@ -163,6 +164,22 @@ async def get_message_history(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
     messages = await get_messages(session_id)
     return HistoryResponse(session_id=str(session_id), messages=messages)
+
+
+@router.delete(
+    "/{session_id}",
+    summary="Delete a chat session and all its messages",
+)
+async def delete_session(
+    session_id: UUID,
+    user: dict = Depends(get_current_user),
+):
+    session = await get_session(session_id)
+    if not session or session["user_id"] != user["id"]:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
+    await execute("DELETE FROM chat_sessions WHERE id = $1", session_id)
+    await clear_chat_window(str(user["id"]), str(session_id))
+    return {"ok": True}
 
 
 @router.post(

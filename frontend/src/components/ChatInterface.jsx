@@ -55,7 +55,22 @@ const s = {
     position: "relative",
   }),
   sessionMode: { fontSize: 11, color: "#aaa", textTransform: "uppercase", letterSpacing: .5, marginBottom: 2 },
-  sessionName: { fontSize: 13, color: "#eee", lineHeight: 1.4, wordBreak: "break-word" },
+  sessionName: { fontSize: 13, color: "#eee", lineHeight: 1.4, wordBreak: "break-word", paddingRight: 20 },
+  deleteBtn: {
+    position: "absolute",
+    top: "50%",
+    right: 8,
+    transform: "translateY(-50%)",
+    background: "none",
+    border: "none",
+    color: "#888",
+    cursor: "pointer",
+    fontSize: 14,
+    padding: "2px 4px",
+    borderRadius: 4,
+    lineHeight: 1,
+    display: "none",
+  },
   sessionNameInput: {
     width: "100%",
     background: "rgba(255,255,255,.1)",
@@ -312,6 +327,20 @@ export default function ChatInterface({ getToken }) {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); sendMessage(); }
   }
 
+  async function deleteSession(sess, e) {
+    e.stopPropagation();
+    if (!confirm(`ลบแชท "${sess.name || "แชทใหม่"}" ?`)) return;
+    try {
+      await api(`/api/chat/${sess.id}`, { method: "DELETE" });
+      setSessions((prev) => prev.filter((s) => s.id !== sess.id));
+      if (activeSession?.id === sess.id) {
+        setActiveSession(null);
+        setMessages([]);
+        setPendingMode(null);
+      }
+    } catch (e) { alert("ลบไม่สำเร็จ: " + e.message); }
+  }
+
   function startRename(sess, e) {
     e.stopPropagation();
     setRenamingId(sess.id);
@@ -346,6 +375,8 @@ export default function ChatInterface({ getToken }) {
         .msg-content pre{background:#1e1e2e;color:#cdd6f4;padding:12px;border-radius:8px;overflow-x:auto;font-size:13px}
         .session-item:hover .rename-hint{opacity:1}
         .rename-hint{opacity:0;transition:opacity .15s;font-size:10px;color:#aaa;margin-top:2px}
+        .session-item:hover .delete-btn{display:block!important}
+        .delete-btn:hover{color:#e94560!important}
       `}</style>
 
       <div style={s.container}>
@@ -365,6 +396,12 @@ export default function ChatInterface({ getToken }) {
                 onClick={() => selectSession(sess)}
               >
                 <div style={s.sessionMode}>{MODE_LABELS[sess.ai_mode]?.icon} {MODE_LABELS[sess.ai_mode]?.th || sess.ai_mode}</div>
+                <button
+                  className="delete-btn"
+                  style={s.deleteBtn}
+                  onClick={(e) => deleteSession(sess, e)}
+                  title="ลบแชท"
+                >×</button>
                 {renamingId === sess.id ? (
                   <input
                     ref={renameInputRef}
