@@ -38,6 +38,17 @@ import asyncio
 _COMPARISON_KW = ("เปรียบ", "compare", " vs ", "ต่าง", "ดีกว่า", "เทียบ", "versus")
 _PREPARATION_KW = ("เตรียม", "prepare", "portfolio", "สัมภาษณ์", "ทำอย่างไร", "ขั้นตอน")
 
+# Tags that must never appear in the final response shown to the user
+_INTERNAL_TAGS = ("sql_result", "career_suggestions", "context")
+
+
+def _strip_internal_tags(text: str) -> str:
+    """Remove any internal XML tags that leaked into the LLM response."""
+    import re
+    for tag in _INTERNAL_TAGS:
+        text = re.sub(rf"</?{tag}[^>]*>", "", text)
+    return text.strip()
+
 
 async def _update_signals(user_id: str, session_id: str, content: str) -> dict:
     """Increment per-session behavioral counters and return updated signals dict."""
@@ -80,7 +91,8 @@ async def handle_dreamer_message(
     system_prompt = compose_dreamer_prompt(profile, career_suggestions, signals=signals, user_role=user_role)
     cfg = get_model_config("dreamer_chat")
     messages = [{"role": "system", "content": system_prompt}] + history + [{"role": "user", "content": content}]
-    return await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
+    response = await chat(cfg["model"], messages, cfg["temperature"], cfg["top_p"], cfg["max_tokens"])
+    return _strip_internal_tags(response)
 
 
 async def handle_tcas_message(
@@ -108,7 +120,7 @@ async def handle_tcas_message(
         import logging
         logging.getLogger(__name__).warning("Numeric claims stripped: %s", flags)
 
-    return response
+    return _strip_internal_tags(response)
 
 
 async def handle_message(
