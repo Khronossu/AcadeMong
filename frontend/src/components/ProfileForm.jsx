@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { t } from "../theme";
+import Icon from "./Icon";
 
 const SUBJECTS = [
   "TGAT1", "TGAT2", "TGAT3", "TGAT",
@@ -29,6 +30,70 @@ const TARGET_UNIVERSITIES = [
 
 const CURRENT_YEAR = new Date().getFullYear();
 
+function SearchChips({ label, placeholder, allOptions, selected, onToggle }) {
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const inputRef = useRef(null);
+
+  const suggestions = allOptions.filter(
+    (o) => !selected.includes(o) && (query === "" || o.toLowerCase().includes(query.toLowerCase()))
+  );
+
+  return (
+    <div style={sc.wrap}>
+      <label style={styles.label}>{label}</label>
+
+      {/* Selected chips */}
+      {selected.length > 0 && (
+        <div style={sc.chips}>
+          {selected.map((item) => (
+            <span key={item} style={sc.chip}>
+              {item}
+              <button type="button" style={sc.chipX} onClick={() => onToggle(item)}>×</button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Search input */}
+      <div style={sc.inputWrap}>
+        <input
+          ref={inputRef}
+          style={sc.input}
+          value={query}
+          placeholder={placeholder}
+          onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+        />
+        {query && (
+          <button type="button" style={sc.clearBtn} onMouseDown={() => setQuery("")}>×</button>
+        )}
+      </div>
+
+      {/* Dropdown */}
+      {open && suggestions.length > 0 && (
+        <div style={sc.dropdown}>
+          {suggestions.map((item) => (
+            <div
+              key={item}
+              style={sc.dropItem}
+              onMouseDown={(e) => { e.preventDefault(); onToggle(item); setQuery(""); inputRef.current?.focus(); }}
+            >
+              {item}
+            </div>
+          ))}
+        </div>
+      )}
+      {open && suggestions.length === 0 && query.length > 0 && (
+        <div style={sc.dropdown}>
+          <div style={sc.dropEmpty}>ไม่พบรายการ</div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProfileForm({ getToken, onSaved }) {
   const [gpax, setGpax] = useState("");
   const [school, setSchool] = useState("");
@@ -38,12 +103,15 @@ export default function ProfileForm({ getToken, onSaved }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
   const [success, setSuccess] = useState(false);
+  const [started, setStarted] = useState(false);
 
   useEffect(() => {
     getToken()
       .then((token) => fetch("/api/profile/me", { headers: { Authorization: `Bearer ${token}` } }))
       .then((r) => r.json())
       .then((data) => {
+        const hasData = data.gpax != null || data.test_scores?.length || data.interests?.length;
+        if (hasData) setStarted(true);
         if (data.gpax != null) setGpax(String(data.gpax));
         if (data.current_school) setSchool(data.current_school);
         if (data.interests?.length) setInterests(data.interests);
@@ -60,15 +128,11 @@ export default function ProfileForm({ getToken, onSaved }) {
   }, []);
 
   function toggleInterest(tag) {
-    setInterests((prev) =>
-      prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
-    );
+    setInterests((prev) => prev.includes(tag) ? prev.filter((x) => x !== tag) : [...prev, tag]);
   }
 
   function toggleUniversity(name) {
-    setTargetUniversities((prev) =>
-      prev.includes(name) ? prev.filter((u) => u !== name) : [...prev, name]
-    );
+    setTargetUniversities((prev) => prev.includes(name) ? prev.filter((x) => x !== name) : [...prev, name]);
   }
 
   function addScore() {
@@ -91,11 +155,7 @@ export default function ProfileForm({ getToken, onSaved }) {
 
     const validScores = scores
       .filter((s) => s.score !== "" && !isNaN(parseFloat(s.score)))
-      .map((s) => ({
-        subject: s.subject,
-        score: parseFloat(s.score),
-        exam_year: parseInt(s.exam_year, 10),
-      }));
+      .map((s) => ({ subject: s.subject, score: parseFloat(s.score), exam_year: parseInt(s.exam_year, 10) }));
 
     const body = {
       gpax: gpax !== "" ? parseFloat(gpax) : null,
@@ -125,6 +185,41 @@ export default function ProfileForm({ getToken, onSaved }) {
     }
   }
 
+  if (!started) {
+    return (
+      <div style={hero.page}>
+        <div style={hero.card}>
+          <div style={hero.iconWrap}>
+            <Icon name="person" size={48} color={t.accent} />
+          </div>
+          <h1 style={hero.title}>บอก AI เพื่อให้ช่วยได้ดีขึ้น</h1>
+          <p style={hero.sub}>
+            กรอกเกรดเฉลี่ย คะแนนสอบ และมหาวิทยาลัยที่สนใจ
+            <br />เพื่อรับคำแนะนำที่แม่นยำและตรวจสอบสิทธิ์ได้ทันที
+          </p>
+          <div style={hero.features}>
+            {[
+              "ตรวจสอบสิทธิ์ TCAS อัตโนมัติ",
+              "แนะนำคณะที่เหมาะกับโปรไฟล์คุณ",
+              "ปรึกษา AI ได้อย่างแม่นยำยิ่งขึ้น",
+            ].map((f) => (
+              <div key={f} style={hero.feature}>
+                <Icon name="check-circle" size={17} color={t.accent} />
+                <span style={hero.featureText}>{f}</span>
+              </div>
+            ))}
+          </div>
+          <button style={hero.cta} onClick={() => setStarted(true)}>
+            เริ่มกรอกข้อมูล
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ marginLeft: 8 }}>
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <form onSubmit={handleSubmit} style={styles.form}>
       <h2 style={styles.heading}>โปรไฟล์นักเรียน</h2>
@@ -147,40 +242,23 @@ export default function ProfileForm({ getToken, onSaved }) {
         placeholder="ชื่อโรงเรียน"
       />
 
-      {/* Interests */}
-      <h3 style={styles.subheading}>ความสนใจ</h3>
-      <p style={styles.hint}>เลือกสาขาที่สนใจ (เลือกได้หลายอย่าง)</p>
-      <div style={styles.tagGrid}>
-        {INTEREST_TAGS.map((tag) => (
-          <button
-            key={tag}
-            type="button"
-            onClick={() => toggleInterest(tag)}
-            style={{
-              ...styles.tag,
-              ...(interests.includes(tag) ? styles.tagActive : {}),
-            }}
-          >
-            {tag}
-          </button>
-        ))}
-      </div>
+      {/* University search */}
+      <SearchChips
+        label="มหาวิทยาลัยที่สนใจ"
+        placeholder="ค้นหามหาวิทยาลัย..."
+        allOptions={TARGET_UNIVERSITIES}
+        selected={targetUniversities}
+        onToggle={toggleUniversity}
+      />
 
-      {/* Target universities */}
-      <h3 style={styles.subheading}>มหาวิทยาลัยที่สนใจ</h3>
-      <div style={styles.univList}>
-        {TARGET_UNIVERSITIES.map((u) => (
-          <label key={u} style={styles.univRow}>
-            <input
-              type="checkbox"
-              checked={targetUniversities.includes(u)}
-              onChange={() => toggleUniversity(u)}
-              style={{ marginRight: 8 }}
-            />
-            {u}
-          </label>
-        ))}
-      </div>
+      {/* Interest search */}
+      <SearchChips
+        label="ความสนใจ"
+        placeholder="ค้นหาสาขาที่สนใจ..."
+        allOptions={INTEREST_TAGS}
+        selected={interests}
+        onToggle={toggleInterest}
+      />
 
       {/* Test scores */}
       <h3 style={styles.subheading}>คะแนนสอบ</h3>
@@ -223,38 +301,99 @@ export default function ProfileForm({ getToken, onSaved }) {
   );
 }
 
-const styles = {
-  form: { maxWidth: 640, margin: "0 auto", padding: "1.5rem 2rem", fontFamily: "'Inter','Sarabun',sans-serif" },
-  heading: { color: t.text1, marginBottom: "1rem", fontSize: 18, fontWeight: 700 },
-  subheading: { color: t.text1, margin: "1.2rem 0 0.4rem", fontSize: 15, fontWeight: 600 },
-  hint: { color: t.text3, fontSize: "0.85rem", margin: "0 0 0.6rem" },
-  label: { display: "block", marginBottom: "0.25rem", fontWeight: 600, fontSize: "0.9rem", color: t.text2 },
+const hero = {
+  page: {
+    minHeight: "100%", display: "flex", alignItems: "center", justifyContent: "center",
+    padding: "2rem 1.5rem", background: t.bg, fontFamily: "'Inter','Sarabun',sans-serif",
+  },
+  card: {
+    maxWidth: 480, width: "100%", textAlign: "center",
+    background: t.surface, border: `1px solid ${t.border}`,
+    borderRadius: 20, padding: "3rem 2.5rem",
+    boxShadow: "0 8px 40px rgba(0,0,0,.06)",
+  },
+  iconWrap: { marginBottom: 20 },
+  title: { fontSize: 28, fontWeight: 800, color: t.text1, margin: "0 0 12px", lineHeight: 1.25 },
+  sub: {
+    fontSize: 16, color: t.text2, lineHeight: 1.7,
+    margin: "0 0 28px",
+  },
+  features: { display: "flex", flexDirection: "column", gap: 10, marginBottom: 32, textAlign: "left" },
+  feature: { display: "flex", alignItems: "center", gap: 10 },
+  featureText: { fontSize: 15, color: t.text2 },
+  cta: {
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    background: t.accent, color: "#fff", border: "none",
+    borderRadius: 12, padding: "14px 28px",
+    fontSize: 16, fontWeight: 700, cursor: "pointer",
+    fontFamily: "inherit", width: "100%",
+    transition: "background .15s",
+  },
+};
+
+const sc = {
+  wrap: { position: "relative", marginBottom: "1.2rem" },
+  chips: { display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 8 },
+  chip: {
+    display: "inline-flex", alignItems: "center", gap: 4,
+    background: t.accentBg, border: `1px solid ${t.accent}`,
+    borderRadius: 20, padding: "4px 10px",
+    fontSize: 13, color: t.accent, fontWeight: 500,
+  },
+  chipX: {
+    background: "none", border: "none", cursor: "pointer",
+    color: t.accent, fontSize: 15, padding: "0 0 0 2px",
+    lineHeight: 1, display: "flex", alignItems: "center",
+  },
+  inputWrap: { position: "relative" },
   input: {
-    display: "block", width: "100%", padding: "0.5rem 0.7rem",
-    marginBottom: "0.8rem", border: `1.5px solid ${t.border}`, borderRadius: 8,
-    fontSize: "0.95rem", boxSizing: "border-box", background: t.card,
+    display: "block", width: "100%", padding: "10px 36px 10px 12px",
+    border: `1.5px solid ${t.border}`, borderRadius: 8,
+    fontSize: 14, boxSizing: "border-box", background: t.card,
     color: t.text1, fontFamily: "inherit", outline: "none",
   },
-  select: { padding: "0.5rem 0.7rem", border: `1.5px solid ${t.border}`, borderRadius: 8, fontSize: "0.9rem", background: t.card, color: t.text1, fontFamily: "inherit" },
-  tagGrid: { display: "flex", flexWrap: "wrap", gap: 8, marginBottom: "0.75rem" },
-  tag: {
-    padding: "0.3rem 0.8rem", border: `1.5px solid ${t.border}`, borderRadius: 20,
-    background: t.surface, cursor: "pointer", fontSize: "0.82rem", color: t.text2,
-    transition: "all .15s", fontFamily: "inherit",
+  clearBtn: {
+    position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+    background: "none", border: "none", cursor: "pointer",
+    color: t.text3, fontSize: 16, padding: 0, lineHeight: 1,
   },
-  tagActive: { background: t.accent, color: "#fff", borderColor: t.accent },
-  univList: { display: "flex", flexDirection: "column", gap: 10, marginBottom: "0.75rem" },
-  univRow: { display: "flex", alignItems: "center", fontSize: "0.92rem", cursor: "pointer", color: t.text2 },
+  dropdown: {
+    position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0,
+    background: t.surface, border: `1.5px solid ${t.border}`,
+    borderRadius: 8, zIndex: 20,
+    boxShadow: "0 8px 24px rgba(0,0,0,.1)",
+    maxHeight: 220, overflowY: "auto",
+  },
+  dropItem: {
+    padding: "10px 14px", cursor: "pointer", fontSize: 14, color: t.text1,
+    borderBottom: `1px solid ${t.border}`,
+    transition: "background .1s",
+  },
+  dropEmpty: { padding: "10px 14px", fontSize: 13, color: t.text3 },
+};
+
+const styles = {
+  form: { maxWidth: 640, margin: "0 auto", padding: "1.5rem 2rem", fontFamily: "'Inter','Sarabun',sans-serif" },
+  heading: { color: t.text1, marginBottom: "1.2rem", fontSize: 20, fontWeight: 700 },
+  subheading: { color: t.text1, margin: "1.2rem 0 0.4rem", fontSize: 15, fontWeight: 600 },
+  label: { display: "block", marginBottom: "0.3rem", fontWeight: 600, fontSize: 14, color: t.text2 },
+  input: {
+    display: "block", width: "100%", padding: "10px 12px",
+    marginBottom: "1rem", border: `1.5px solid ${t.border}`, borderRadius: 8,
+    fontSize: 14, boxSizing: "border-box", background: t.card,
+    color: t.text1, fontFamily: "inherit", outline: "none",
+  },
+  select: { padding: "10px 12px", border: `1.5px solid ${t.border}`, borderRadius: 8, fontSize: 14, background: t.card, color: t.text1, fontFamily: "inherit" },
   scoreRow: { display: "flex", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap" },
   addBtn: {
     background: "none", border: `1px dashed ${t.borderMd}`, borderRadius: 8,
     padding: "0.35rem 0.75rem", cursor: "pointer", marginBottom: "1rem",
-    color: "#555", fontSize: "0.9rem",
+    color: t.text3, fontSize: 14,
   },
   removeBtn: { background: "none", border: "none", cursor: "pointer", color: t.fail, fontSize: "1rem", padding: "0 4px" },
   saveBtn: {
     background: t.accent, color: "#fff", border: "none", borderRadius: 8,
-    padding: "0.6rem 1.5rem", cursor: "pointer", fontSize: "1rem", marginTop: "0.5rem", fontFamily: "inherit",
+    padding: "10px 24px", cursor: "pointer", fontSize: 15, marginTop: "0.5rem", fontFamily: "inherit", fontWeight: 600,
   },
   error:   { color: t.fail, marginBottom: "0.5rem", fontSize: 13 },
   success: { color: t.pass, marginBottom: "0.5rem", fontSize: 13 },

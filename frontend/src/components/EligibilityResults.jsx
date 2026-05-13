@@ -2,6 +2,7 @@ import { useState } from "react";
 import CutoffChart from "./CutoffChart";
 import EligibilityOverview from "./EligibilityOverview";
 import { t } from "../theme";
+import Icon from "./Icon";
 
 const GROUP_OPTIONS = [
   { key: "university", label: "มหาวิทยาลัย" },
@@ -76,17 +77,47 @@ export default function EligibilityResults({ getToken }) {
   const eligibleTotal = results?.eligible_count ?? 0;
   const total = results?.total_projects ?? 0;
 
+  // Show large hero when idle (no results yet, not loading)
+  if (!results && !loading && !error) {
+    return (
+      <div style={eh.page}>
+        <div style={eh.card}>
+          <div style={eh.iconWrap}>
+            <Icon name="check-circle" size={52} color={t.accent} />
+          </div>
+          <h1 style={eh.title}>ตรวจสอบสิทธิ์ TCAS</h1>
+          <p style={eh.sub}>
+            ระบบเปรียบเทียบ GPAX และคะแนนสอบของคุณกับทุกโครงการรับสมัคร
+            <br />แบบเรียลไทม์ ไม่ต้องค้นหาเอง
+          </p>
+          <div style={eh.stats}>
+            {[["5", "มหาวิทยาลัย"], ["100+", "โครงการ"], ["TCAS 3", "รอบ Admission"]].map(([num, lbl], i, arr) => (
+              <div key={lbl} style={{ ...eh.stat, ...(i === arr.length - 1 ? { borderRight: "none" } : {}) }}>
+                <span style={eh.statNum}>{num}</span>
+                <span style={eh.statLabel}>{lbl}</span>
+              </div>
+            ))}
+          </div>
+          <button style={eh.cta} onClick={runCheck}>
+            ตรวจสอบเลย
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" style={{ marginLeft: 8 }}>
+              <path d="M5 12h14M12 5l7 7-7 7" />
+            </svg>
+          </button>
+          <p style={eh.prereq}>บันทึก GPAX และคะแนนสอบในแท็บ "โปรไฟล์" ก่อนนะ</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={cs.container}>
-      <h2 style={cs.heading}>ตรวจสอบคุณสมบัติ TCAS รอบ 3</h2>
-      <p style={cs.hint}>
-        กดปุ่มด้านล่างเพื่อดูโครงการรับสมัครทั้งหมดที่คุณมีสิทธิ์สมัคร<br />
-        (บันทึก GPAX และคะแนนสอบในแท็บ "โปรไฟล์" ก่อน)
-      </p>
-
-      <button onClick={runCheck} disabled={loading} style={cs.checkBtn}>
-        {loading ? "กำลังตรวจสอบ..." : "ตรวจสอบคุณสมบัติ"}
-      </button>
+      <div style={cs.topRow}>
+        <h2 style={cs.heading}>ตรวจสอบคุณสมบัติ TCAS รอบ 3</h2>
+        <button onClick={runCheck} disabled={loading} style={cs.checkBtn}>
+          {loading ? "กำลังตรวจสอบ..." : "ตรวจสอบใหม่"}
+        </button>
+      </div>
 
       {error && <p style={cs.error}>{error}</p>}
 
@@ -302,14 +333,44 @@ export function ProjectCard({ result, getToken }) {
   return <ProjectRow result={result} getToken={getToken} />;
 }
 
+const eh = {
+  page: {
+    minHeight: "100%", display: "flex", alignItems: "center", justifyContent: "center",
+    padding: "2rem 1.5rem", background: t.bg, fontFamily: "'Inter','Sarabun',sans-serif",
+  },
+  card: {
+    maxWidth: 480, width: "100%", textAlign: "center",
+    background: t.surface, border: `1px solid ${t.border}`,
+    borderRadius: 20, padding: "3rem 2.5rem",
+    boxShadow: "0 8px 40px rgba(0,0,0,.06)",
+  },
+  iconWrap: { marginBottom: 20 },
+  title: { fontSize: 28, fontWeight: 800, color: t.text1, margin: "0 0 12px", lineHeight: 1.25 },
+  sub: { fontSize: 16, color: t.text2, lineHeight: 1.7, margin: "0 0 28px" },
+  stats: { display: "flex", justifyContent: "center", gap: 0, marginBottom: 32, border: `1px solid ${t.border}`, borderRadius: 12, overflow: "hidden" },
+  stat: { flex: 1, padding: "14px 8px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4, borderRight: `1px solid ${t.border}` },
+  statNum: { fontSize: 22, fontWeight: 800, color: t.accent },
+  statLabel: { fontSize: 12, color: t.text3 },
+  cta: {
+    display: "inline-flex", alignItems: "center", justifyContent: "center",
+    background: t.accent, color: "#fff", border: "none",
+    borderRadius: 12, padding: "14px 28px",
+    fontSize: 16, fontWeight: 700, cursor: "pointer",
+    fontFamily: "inherit", width: "100%", marginBottom: 16,
+    transition: "background .15s",
+  },
+  prereq: { fontSize: 13, color: t.text3, margin: 0 },
+};
+
 const cs = {
   container: { maxWidth: 860, margin: "0 auto", padding: "1.5rem 2rem", fontFamily: "'Inter','Sarabun',sans-serif" },
-  heading: { color: t.text1, fontSize: 18, fontWeight: 700 },
-  hint: { color: t.text3, marginBottom: "1rem", lineHeight: 1.6, fontSize: 13 },
+  topRow: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: "0.75rem", flexWrap: "wrap" },
+  heading: { color: t.text1, fontSize: 18, fontWeight: 700, margin: 0 },
   checkBtn: {
     background: t.accent, color: "#fff", border: "none", borderRadius: 8,
-    padding: "0.6rem 1.5rem", cursor: "pointer", fontSize: "0.95rem", marginBottom: "1rem", fontFamily: "inherit",
+    padding: "0.6rem 1.5rem", cursor: "pointer", fontSize: "0.95rem", fontFamily: "inherit",
   },
+  hint: { color: t.text3, marginBottom: "1rem", lineHeight: 1.6, fontSize: 13 },
   error: { color: t.fail, fontSize: 13 },
   summary: { display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" },
   badge: { background: t.accent, color: "#fff", borderRadius: 20, padding: "0.25rem 0.75rem", fontSize: "0.82rem" },
