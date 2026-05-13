@@ -124,6 +124,18 @@ async def handle_tcas_message(
         logging.getLogger(__name__).warning("Numeric claims stripped: %s", flags)
 
     response = _strip_internal_tags(response)
+
+    # Citation footer — if RAG context was used and LLM didn't cite any source, append one
+    if rag_context and "[ที่มา:" not in response:
+        import re
+        sources = []
+        for chunk in rag_context:
+            m = re.search(r"\[ที่มา: ([^\]]+)\]", chunk)
+            if m and m.group(1) not in sources:
+                sources.append(m.group(1))
+        if sources:
+            response += "\n\n---\n*ที่มาข้อมูล: " + " | ".join(sources) + "*"
+
     _safe, response, _ = await check_safety(content, response)
     return response
 

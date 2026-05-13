@@ -249,6 +249,8 @@ def compose_tcas_prompt(
         f"Answer the student's questions about their eligibility using ONLY the data "
         f"inside <sql_result> above. Never invent or guess a threshold. "
         f"Use information inside <context> tags as supporting detail when relevant. "
+        f"When you use information from a <context> block, cite it inline as [ที่มา: ...] "
+        f"using the source tag already present in the context text. "
         f"If the student asks about a project not listed, tell them it is not in the "
         f"current dataset and suggest they check mytcas.com for the latest information.\n"
         f"{suffix}"
