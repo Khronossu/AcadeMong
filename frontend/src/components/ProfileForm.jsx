@@ -281,7 +281,7 @@ export default function ProfileForm({ getToken, onSaved }) {
             placeholder="คะแนน"
           />
           <input
-            style={{ ...styles.input, width: "70px", margin: "0 8px 0 0" }}
+            style={{ ...styles.input, width: "96px", margin: "0 8px 0 0" }}
             type="number" min="2020" max="2100"
             value={s.exam_year}
             onChange={(e) => updateScore(i, "exam_year", e.target.value)}
@@ -387,7 +387,7 @@ const styles = {
   scoreRow: { display: "flex", alignItems: "center", marginBottom: "0.5rem", flexWrap: "wrap" },
   addBtn: {
     background: "none", border: `1px dashed ${t.borderMd}`, borderRadius: 8,
-    padding: "0.35rem 0.75rem", cursor: "pointer", marginBottom: "1rem",
+    padding: "0.35rem 0.75rem", cursor: "pointer", marginBottom: "2.5rem",
     color: t.text3, fontSize: 14,
   },
   removeBtn: { background: "none", border: "none", cursor: "pointer", color: t.fail, fontSize: "1rem", padding: "0 4px" },

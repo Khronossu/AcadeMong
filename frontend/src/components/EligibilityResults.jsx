@@ -1,6 +1,5 @@
 import { useState } from "react";
 import CutoffChart from "./CutoffChart";
-import EligibilityOverview from "./EligibilityOverview";
 import { t } from "../theme";
 import Icon from "./Icon";
 
@@ -146,8 +145,6 @@ export default function EligibilityResults({ getToken }) {
               ))}
             </div>
           </div>
-
-          <EligibilityOverview results={results.results} getToken={getToken} />
 
           {filtered.length === 0 ? (
             <p style={cs.empty}>ไม่มีโครงการในหมวดนี้</p>
@@ -363,79 +360,79 @@ const eh = {
 };
 
 const cs = {
-  container: { maxWidth: 860, margin: "0 auto", padding: "1.5rem 2rem", fontFamily: "'Inter','Sarabun',sans-serif" },
-  topRow: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: "0.75rem", flexWrap: "wrap" },
+  container: { maxWidth: 860, margin: "0 auto", padding: "24px 32px", fontFamily: "'Inter','Sarabun',sans-serif", fontSize: 14 },
+  topRow: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 12, flexWrap: "wrap" },
   heading: { color: t.text1, fontSize: 18, fontWeight: 700, margin: 0 },
   checkBtn: {
     background: t.accent, color: "#fff", border: "none", borderRadius: 8,
-    padding: "0.6rem 1.5rem", cursor: "pointer", fontSize: "0.95rem", fontFamily: "inherit",
+    padding: "8px 20px", cursor: "pointer", fontSize: 14, fontFamily: "inherit",
   },
-  hint: { color: t.text3, marginBottom: "1rem", lineHeight: 1.6, fontSize: 13 },
+  hint: { color: t.text3, marginBottom: 16, lineHeight: 1.6, fontSize: 13 },
   error: { color: t.fail, fontSize: 13 },
-  summary: { display: "flex", gap: "0.5rem", marginBottom: "1rem", flexWrap: "wrap" },
-  badge: { background: t.accent, color: "#fff", borderRadius: 20, padding: "0.25rem 0.75rem", fontSize: "0.82rem" },
-  controls: { display: "flex", flexDirection: "column", gap: 8, marginBottom: "1.25rem" },
+  summary: { display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" },
+  badge: { background: t.accent, color: "#fff", borderRadius: 20, padding: "3px 12px", fontSize: 13 },
+  controls: { display: "flex", flexDirection: "column", gap: 8, marginBottom: 20 },
   controlGroup: { display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" },
-  controlLabel: { fontSize: "0.82rem", color: t.text3, minWidth: 90 },
-  pill: { border: `1px solid ${t.border}`, borderRadius: 20, padding: "0.2rem 0.7rem", cursor: "pointer", background: t.surface, fontSize: "0.82rem", color: t.text2, fontFamily: "inherit" },
+  controlLabel: { fontSize: 13, color: t.text3, minWidth: 90 },
+  pill: { border: `1px solid ${t.border}`, borderRadius: 20, padding: "3px 11px", cursor: "pointer", background: t.surface, fontSize: 13, color: t.text2, fontFamily: "inherit" },
   pillActive: { background: t.accent, color: "#fff", border: `1px solid ${t.accent}` },
-  empty: { color: t.text3, textAlign: "center", padding: "2rem" },
+  empty: { color: t.text3, textAlign: "center", padding: 32 },
 };
 
 const gs = {
-  section: { marginBottom: "0.75rem", border: `1px solid ${t.border}`, borderRadius: 10, overflow: "hidden" },
+  section: { marginBottom: 10, border: `1px solid ${t.border}`, borderRadius: 10, overflow: "hidden" },
   header: {
     display: "flex", justifyContent: "space-between", alignItems: "center",
-    padding: "0.75rem 1rem", cursor: "pointer", background: t.card, userSelect: "none",
+    padding: "12px 16px", cursor: "pointer", background: t.card, userSelect: "none",
   },
   headerLeft: { display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" },
-  groupName: { fontWeight: 700, color: t.text1, fontSize: "0.95rem" },
-  count: { fontSize: "0.82rem", fontWeight: 600 },
-  toggle: { color: t.text3, fontSize: "0.9rem" },
-  body: { padding: "0.5rem 0.75rem", background: t.bg },
+  groupName: { fontWeight: 700, color: t.text1, fontSize: 14 },
+  count: { fontSize: 13, fontWeight: 600 },
+  toggle: { color: t.text3, fontSize: 13 },
+  body: { padding: "8px 12px", background: t.bg },
 };
 
 const mc = {
   card: {
-    border: "1px solid #e8e8e8", borderRadius: 8, marginBottom: "0.5rem",
-    overflow: "hidden", background: "#fff",
+    border: `1px solid ${t.border}`, borderRadius: 8, marginBottom: 8,
+    overflow: "hidden", background: t.surface,
   },
   header: {
     display: "flex", alignItems: "center", gap: 10,
-    padding: "0.75rem 1rem", cursor: "pointer", background: "#fafafa",
+    padding: "12px 16px", cursor: "pointer", background: t.card,
   },
-  majorName: { fontWeight: 700, color: "#1a1a2e", fontSize: "0.95rem", marginBottom: 2 },
-  meta: { display: "flex", alignItems: "center", gap: 6, fontSize: "0.82rem", color: "#666", flexWrap: "wrap" },
-  dot: { color: "#ccc" },
+  majorName: { fontWeight: 700, color: t.text1, fontSize: 14, marginBottom: 2 },
+  meta: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, color: t.text2, flexWrap: "wrap" },
+  dot: { color: t.borderMd },
   eligCount: { fontWeight: 600 },
-  toggle: { color: "#888", fontSize: "0.85rem" },
-  projectList: { borderTop: "1px solid #f0f0f0" },
+  toggle: { color: t.text3, fontSize: 13 },
+  projectList: { borderTop: `1px solid ${t.border}` },
 };
 
 const pr = {
-  row: { borderBottom: "1px solid #f5f5f5" },
+  row: { borderBottom: `1px solid ${t.border}` },
   summary: {
-    display: "flex", alignItems: "center", gap: 8, padding: "0.55rem 1rem",
-    cursor: "pointer", background: "#fff", flexWrap: "wrap",
+    display: "flex", alignItems: "center", gap: 8, padding: "9px 16px",
+    cursor: "pointer", background: t.surface, flexWrap: "wrap",
   },
   badge: {
-    color: "#fff", borderRadius: 10, padding: "0.1rem 0.45rem",
-    fontSize: "0.7rem", fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0,
+    color: "#fff", borderRadius: 10, padding: "2px 7px",
+    fontSize: 12, fontWeight: 600, whiteSpace: "nowrap", flexShrink: 0,
   },
-  projectName: { flex: 1, fontSize: "0.88rem", color: "#333", minWidth: 0 },
+  projectName: { flex: 1, fontSize: 13, color: t.text1, minWidth: 0 },
   rightMeta: { display: "flex", alignItems: "center", gap: 6, flexShrink: 0 },
-  gpaxTag: { fontSize: "0.75rem", color: "#888", background: "#f5f5f5", padding: "1px 6px", borderRadius: 8 },
-  seatsTag: { fontSize: "0.75rem", color: "#888" },
-  toggle: { color: "#aaa", fontSize: "0.8rem" },
-  details: { padding: "0.75rem 1rem", background: "#fafafa", borderTop: "1px solid #eee" },
+  gpaxTag: { fontSize: 12, color: t.text3, background: t.card, padding: "1px 6px", borderRadius: 8 },
+  seatsTag: { fontSize: 12, color: t.text3 },
+  toggle: { color: t.text3, fontSize: 13 },
+  details: { padding: "12px 16px", background: t.card, borderTop: `1px solid ${t.border}` },
 };
 
 const styles = {
-  subHeading: { fontWeight: 600, margin: "0.5rem 0 0.35rem", fontSize: "0.88rem", color: "#333" },
-  table: { width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" },
-  th: { textAlign: "left", padding: "0.3rem 0.5rem", borderBottom: "1px solid #ddd", color: "#555" },
-  td: { padding: "0.3rem 0.5rem", borderBottom: "1px solid #f0f0f0" },
-  pass: { color: "#0a7", fontWeight: 600 },
-  fail: { color: "#c33", fontWeight: 600 },
-  link: { color: "#0f3460", fontSize: "0.82rem", display: "inline-block", marginTop: "0.5rem" },
+  subHeading: { fontWeight: 600, margin: "8px 0 6px", fontSize: 13, color: t.text2 },
+  table: { width: "100%", borderCollapse: "collapse", fontSize: 13 },
+  th: { textAlign: "left", padding: "5px 8px", borderBottom: `1px solid ${t.border}`, color: t.text2 },
+  td: { padding: "5px 8px", borderBottom: `1px solid ${t.border}` },
+  pass: { color: t.pass, fontWeight: 600 },
+  fail: { color: t.fail, fontWeight: 600 },
+  link: { color: t.accent, fontSize: 13, display: "inline-block", marginTop: 8 },
 };
