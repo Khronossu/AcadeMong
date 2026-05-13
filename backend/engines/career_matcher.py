@@ -137,7 +137,8 @@ async def get_career_suggestions(
     if profile.get("strengths"):
         parts.append("จุดแข็ง: " + ", ".join(profile["strengths"]))
     if profile.get("career_goals"):
-        parts.append("เป้าหมาย: " + profile["career_goals"])
+        goals = profile["career_goals"]
+        parts.append("เป้าหมาย: " + (", ".join(goals) if isinstance(goals, list) else str(goals)))
 
     profile_text = " ".join(parts) if parts else ""
     if not profile_text:

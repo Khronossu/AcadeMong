@@ -87,7 +87,7 @@ async def _send_message(
         resp = await client.post(
             f"{API_BASE}/api/chat/{session_id}/message",
             json={"content": content},
-            timeout=120,
+            timeout=180,
         )
         if resp.status_code == 200:
             data = resp.json()

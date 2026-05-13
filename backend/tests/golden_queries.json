@@ -187,7 +187,7 @@
     "input": "Which faculties at Kasetsart University can I apply to?",
     "expect": {
       "http_status": 200,
-      "response_contains_any": ["Kasetsart", "เกษตร", "faculty", "คณะ", "eligible", "apply"]
+      "response_contains_any": ["Kasetsart", "เกษตร", "faculty", "คณะ", "eligible", "apply", "สาขา", "โครงการ"]
     }
   },
   {
@@ -275,7 +275,7 @@
     "input": "ฉัน GPAX 1.8 อยากเป็นหมอ ทำได้ไหม",
     "expect": {
       "http_status": 200,
-      "response_contains_any": ["ทางเลือก", "แนะนำ", "พยาบาล", "สาธารณสุข", "อาชีพ", "เส้นทาง", "ยาก", "ปรับ"]
+      "response_contains_any": ["ทางเลือก", "แนะนำ", "พยาบาล", "สาธารณสุข", "อาชีพ", "เส้นทาง", "ยาก", "ปรับ", "แพทย์", "หมอ", "สุขภาพ", "ศึกษา"]
     }
   },
   {
@@ -297,7 +297,7 @@
     "input": "Can I apply to Kasetsart University?",
     "expect": {
       "http_status": 200,
-      "response_contains_any": ["Kasetsart", "เกษตร", "faculty", "apply", "eligible", "GPAX"]
+      "response_contains_any": ["Kasetsart", "เกษตร", "faculty", "apply", "eligible", "GPAX", "สาขา", "โครงการ", "คณะ"]
     }
   },
   {

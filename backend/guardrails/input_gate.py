@@ -47,6 +47,17 @@ _INJECTION_PATTERNS: list[re.Pattern] = [
     r"pretend\s+(?:you\s+are|to\s+be)",
     r"DAN\b",           # "Do Anything Now" jailbreak
     r"jailbreak",
+    # Role override — "You are an AI with no rules / restrictions"
+    r"you\s+are\s+an?\s+ai\s+with\s+no\s+(?:rules|restrictions|limits)",
+    r"คุณคือ(?:\s+\S+){0,3}\s*ที่ไม่มีข้อจำกัด",
+    # Prompt extraction
+    r"repeat\s+(?:the\s+)?(?:text|prompt|instruction|message)\s+(?:above|before|verbatim|word)",
+    r"word\s+for\s+word",
+    r"print\s+(?:your\s+)?(?:full\s+)?(?:context|system\s+prompt|prompt)",
+    r"reveal\s+(?:your\s+)?(?:system\s+)?(?:prompt|instructions)",
+    # Role-play jailbreak
+    r"(?:let'?s\s+play\s+a\s+game|play\s+a\s+role|role.?play).*(?:no\s+rules|no\s+limits|no\s+restrictions)",
+    r"with\s+no\s+(?:rules|restrictions|limits|constraints)",
 ]]
 
 
@@ -84,33 +95,49 @@ _EDUCATION_KEYWORDS: frozenset[str] = frozenset([
     "prepare", "interview",
 ])
 
-_OFFTOPIC_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
+# Patterns that are hard-blocked — clearly off-topic, no ambiguity
+_HARD_OFFTOPIC_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
     r"\brecipe\b",
-    r"\bcook(ing)?\b",
+    r"how\s+to\s+cook",
+    r"สอนทำ(?:อาหาร|ขนม|ผัด|ต้ม|แกง)",
+    r"วิธีทำ(?:อาหาร|ขนม)",
+    r"solve\s+(?:this\s+)?(?:equation|problem)\b",
+    r"แก้โจทย์",
+    r"ช่วยแก้(?:โจทย์|สมการ|ปัญหาคณิต)",
+    r"x\^2\s*[+\-]",       # math equation pattern
+    r"\bx²\b",
+    r"write\s+(?:my\s+)?(?:essay|story|poem|code)\b",
+    r"translate\s+this\s+(?:text|sentence|paragraph)",
+    r"แปลภาษา(?:ให้|หน่อย)",
+]]
+
+# Patterns that are soft-warned but not blocked
+_SOFT_OFFTOPIC_PATTERNS: list[re.Pattern] = [re.compile(p, re.IGNORECASE) for p in [
     r"\bhomework\b",
-    r"\bmath\s+homework\b",
-    r"write\s+(my\s+)?essay",
-    r"solve\s+(this\s+)?equation",
-    r"translate\s+this",
+    r"write\s+my\s+essay",
 ]]
 
 
-def validate_topic(message: str) -> bool:
-    """Return True if message appears on-topic (education/TCAS/career).
+def validate_topic(message: str) -> None:
+    """Check if message is on-topic (education/TCAS/career).
 
-    This is advisory — callers should log a warning but NOT block on False.
-    Returns True by default to avoid false positives on ambiguous Thai text.
+    Hard off-topic: raises HTTP 400 immediately.
+    Soft off-topic: logs a warning, lets the LLM handle the refusal.
+    On-topic or ambiguous: passes through silently.
     """
+    from fastapi import HTTPException
     normalized = _normalize(message).lower()
-    has_education_keyword = any(kw.lower() in normalized for kw in _EDUCATION_KEYWORDS)
-    has_offtopic = any(p.search(normalized) for p in _OFFTOPIC_PATTERNS)
 
-    if has_education_keyword:
-        return True
-    if has_offtopic:
-        logger.warning("Off-topic message detected (advisory): %.80s", message)
-        return False
-    return True  # permissive default
+    # Hard block — clearly nothing to do with education
+    if any(p.search(normalized) for p in _HARD_OFFTOPIC_PATTERNS):
+        raise HTTPException(
+            status_code=400,
+            detail="ขออภัย ระบบนี้ช่วยได้เฉพาะเรื่อง TCAS การเลือกคณะ และการวางแผนอาชีพเท่านั้น",
+        )
+
+    # Soft warn — ambiguous, let the LLM refuse naturally
+    if any(p.search(normalized) for p in _SOFT_OFFTOPIC_PATTERNS):
+        logger.warning("Soft off-topic message (advisory): %.80s", message)
 
 
 # ---------------------------------------------------------------------------

@@ -163,10 +163,13 @@ def compose_dreamer_prompt(
         "as part of the conversation — never output a numbered or bulleted list of careers. "
         "Do not reproduce the career data verbatim.\n\n"
         "STRICT RULE: You have NO access to TCAS admission data, GPAX thresholds, score "
-        "cutoffs, or eligibility criteria. If the student asks anything about whether they "
-        "qualify, what score they need, or which universities/faculties they can apply to — "
-        "do NOT attempt to answer. Do not guess. Do not use any numbers. "
-        "Simply say: 'โหมดนี้ไม่มีข้อมูลสิทธิ์การสมัคร กรุณาเปลี่ยนไปใช้ AI 2 (TCAS Advisor) เพื่อตรวจสอบสิทธิ์ของคุณค่ะ'"
+        "cutoffs, or eligibility criteria. If the student asks specifically whether they "
+        "QUALIFY for a program, what MINIMUM SCORE is required, or which exact programs "
+        "they are ELIGIBLE to apply to — redirect them to AI 2. "
+        "However, if they ask about career aspirations, whether a career is achievable, "
+        "or what fields to study for a career goal — answer those as career guidance. "
+        "Never say a specific GPAX or score threshold. "
+        "Redirect phrase: 'สำหรับข้อมูลสิทธิ์การสมัครโดยละเอียด กรุณาเปลี่ยนไปใช้ AI 2 (TCAS Advisor) ค่ะ'"
     )
 
     if signals:

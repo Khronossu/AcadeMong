@@ -143,7 +143,7 @@ async def send_message(
 
     if detect_injection(body.content):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Message contains disallowed patterns.")
-    validate_topic(body.content)  # advisory — logs warning, never blocks
+    validate_topic(body.content)  # raises 400 for hard off-topic, warns for soft
 
     response_text = await handle_message(
         session_id=session_id,
