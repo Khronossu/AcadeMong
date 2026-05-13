@@ -22,6 +22,8 @@ import unicodedata
 
 from fastapi import HTTPException
 
+from guardrails.pii_redactor import redact_truncate as _redact_log
+
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
@@ -144,7 +146,7 @@ def validate_topic(message: str) -> None:
 
     # Soft warn — ambiguous, let the LLM refuse naturally
     if any(p.search(normalized) for p in _SOFT_OFFTOPIC_PATTERNS):
-        logger.warning("Soft off-topic message (advisory): %.80s", message)
+        logger.warning("Soft off-topic message (advisory): %s", _redact_log(message, 80))
 
 
 # ---------------------------------------------------------------------------

@@ -14,27 +14,15 @@ from __future__ import annotations
 
 import json
 import logging
-import re
 import time
 from typing import Callable
 
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
+from guardrails.pii_redactor import redact as _redact
+
 logger = logging.getLogger("academong.requests")
-
-# PII patterns — applied to path/query strings only (bodies are never logged)
-_PII_PATTERNS = [
-    (re.compile(r"\b\d{13}\b"), "[THAI_ID]"),                             # Thai national ID
-    (re.compile(r"\b0[689]\d{8}\b"), "[PHONE]"),                          # Thai mobile
-    (re.compile(r"[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}"), "[EMAIL]"),
-]
-
-
-def _redact(text: str) -> str:
-    for pattern, replacement in _PII_PATTERNS:
-        text = pattern.sub(replacement, text)
-    return text
 
 
 def _extract_user_id(request: Request) -> str:

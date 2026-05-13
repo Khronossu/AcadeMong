@@ -22,6 +22,7 @@ from engines.prompt_composer import compose_dreamer_prompt, compose_tcas_prompt
 from engines.rag_engine import retrieve_context
 from guardrails.numeric_validator import validate_numeric_claims
 from guardrails.safety_filter import check_safety
+from db.postgres import execute as _db_execute
 from memory.long_term_memory import save_message
 from memory.session_memory import (
     append_to_chat_window,
@@ -98,6 +99,49 @@ async def handle_dreamer_message(
     return response
 
 
+async def _enforce_citations(
+    response: str,
+    rag_context: list[str] | None,
+    session_id,
+) -> tuple[str, bool]:
+    """Ensure every response that used RAG context has at least one citation.
+
+    If the LLM already cited inline ([ที่มา: ...]), return as-is with ok=True.
+    If RAG was used but no citation found, append a structured source footer
+    and flag the response in the admin review queue (uncited RAG response).
+    Returns (final_response, citation_was_present).
+    """
+    import re as _re
+
+    if not rag_context:
+        return response, True
+
+    if "[ที่มา:" in response:
+        return response, True
+
+    # Extract all unique sources from the RAG chunks
+    sources: list[str] = []
+    for chunk in rag_context:
+        m = _re.search(r"\[ที่มา: ([^\]]+)\]", chunk)
+        if m and m.group(1) not in sources:
+            sources.append(m.group(1))
+
+    if sources:
+        response += "\n\n---\n*ที่มาข้อมูล: " + " | ".join(sources) + "*"
+
+    # Flag to admin review queue so uncited RAG responses can be reviewed
+    try:
+        await _db_execute(
+            """INSERT INTO flagged_outputs (reason)
+               VALUES ($1)""",
+            f"Uncited RAG response — session {session_id}",
+        )
+    except Exception:
+        pass  # never block the response over a logging write failure
+
+    return response, False
+
+
 async def handle_tcas_message(
     user_id: UUID,
     session_id: UUID,
@@ -124,17 +168,12 @@ async def handle_tcas_message(
         logging.getLogger(__name__).warning("Numeric claims stripped: %s", flags)
 
     response = _strip_internal_tags(response)
-
-    # Citation footer — if RAG context was used and LLM didn't cite any source, append one
-    if rag_context and "[ที่มา:" not in response:
-        import re
-        sources = []
-        for chunk in rag_context:
-            m = re.search(r"\[ที่มา: ([^\]]+)\]", chunk)
-            if m and m.group(1) not in sources:
-                sources.append(m.group(1))
-        if sources:
-            response += "\n\n---\n*ที่มาข้อมูล: " + " | ".join(sources) + "*"
+    response, citation_ok = await _enforce_citations(response, rag_context, session_id)
+    if not citation_ok:
+        import logging as _log
+        _log.getLogger(__name__).warning(
+            "RAG response missing inline citations — session %s; footer appended", session_id
+        )
 
     _safe, response, _ = await check_safety(content, response)
     return response
