@@ -11,3 +11,4 @@ data/pdfs/**
 !data/career/
 !data/career/*.json
 .venv/
+.claude/
