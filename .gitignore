@@ -1,4 +1,12 @@
 .env
+# Terraform — never commit state or secret var files
+infra/**/.terraform/
+infra/**/*.tfstate
+infra/**/*.tfstate.backup
+infra/**/.terraform.lock.hcl
+infra/**/terraform.tfvars
+infra/**/*.tfvars
+!infra/**/terraform.tfvars.example
 __pycache__/
 *.pyc
 .pytest_cache/
@@ -12,3 +20,9 @@ data/pdfs/**
 !data/career/*.json
 .venv/
 .claude/
+# LaTeX build artifacts
+docs/*.aux
+docs/*.log
+docs/*.out
+docs/*.synctex.gz
+docs/*.toc

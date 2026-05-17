@@ -29,7 +29,7 @@ function AppContent({ getToken, username, signOut }) {
 
   const api = useCallback(async (path, opts = {}) => {
     const token = await getToken();
-    const res = await fetch(path, {
+    const res = await fetch((import.meta.env.VITE_API_BASE || "") + path, {
       ...opts,
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...opts.headers },
     });

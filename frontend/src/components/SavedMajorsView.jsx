@@ -14,7 +14,7 @@ export default function SavedMajorsView({ getToken }) {
       try {
         const token = await getToken();
         if (controller.signal.aborted) return;
-        const res = await fetch("/api/profile/saved-majors", {
+        const res = await fetch((import.meta.env.VITE_API_BASE||"")+"/api/profile/saved-majors", {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });
@@ -44,7 +44,7 @@ export default function SavedMajorsView({ getToken }) {
   async function handleSaveNote(majorId, note) {
     try {
       const token = await getToken();
-      await fetch("/api/profile/saved-majors", {
+      await fetch((import.meta.env.VITE_API_BASE||"")+"/api/profile/saved-majors", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ major_id: majorId, notes: note }),

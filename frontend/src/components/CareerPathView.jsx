@@ -128,7 +128,7 @@ export default function CareerPathView({ getToken }) {
       try {
         const token = await getToken();
         if (controller.signal.aborted) return;
-        const res = await fetch("/api/profile/career-recommendations", {
+        const res = await fetch((import.meta.env.VITE_API_BASE||"")+"/api/profile/career-recommendations", {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });

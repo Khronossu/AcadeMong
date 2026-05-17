@@ -50,7 +50,7 @@ export default function EligibilityResults({ getToken }) {
     setResults(null);
     try {
       const token = await getToken();
-      const res = await fetch("/api/chat/eligibility", {
+      const res = await fetch((import.meta.env.VITE_API_BASE||"")+"/api/chat/eligibility", {
         method: "POST",
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -216,7 +216,7 @@ function MajorCard({ majorGroup, getToken }) {
     setSaving(true);
     try {
       const token = await getToken();
-      const res = await fetch("/api/profile/saved-majors", {
+      const res = await fetch((import.meta.env.VITE_API_BASE||"")+"/api/profile/saved-majors", {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify({ major_id }),

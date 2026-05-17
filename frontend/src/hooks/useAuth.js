@@ -34,7 +34,7 @@ export function useAuth() {
   async function _tryLogin(firebaseUser) {
     try {
       const idToken = await firebaseUser.getIdToken();
-      const res = await fetch("/api/auth/login", {
+      const res = await fetch((import.meta.env.VITE_API_BASE||"")+"/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken }),
@@ -67,7 +67,7 @@ export function useAuth() {
     setRegisterError(null);
     try {
       const idToken = await user.getIdToken();
-      const res = await fetch("/api/auth/register", {
+      const res = await fetch((import.meta.env.VITE_API_BASE||"")+"/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ idToken, username: usernameInput }),

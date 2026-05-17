@@ -1,3 +1,6 @@
+import sys
+print("=== AcadeMong starting ===", flush=True)
+
 import logging
 import logging.config
 import os
@@ -45,9 +48,26 @@ logging.config.dictConfig({
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await init_postgres_pool()
-    init_redis_pool()
-    initialize_firebase()
+    print("Connecting to PostgreSQL...", flush=True)
+    try:
+        await init_postgres_pool()
+        print("PostgreSQL OK", flush=True)
+    except Exception as e:
+        print(f"PostgreSQL FAILED (non-fatal): {e}", flush=True)
+
+    print("Connecting to Redis...", flush=True)
+    try:
+        init_redis_pool()
+        print("Redis OK", flush=True)
+    except Exception as e:
+        print(f"Redis FAILED (non-fatal): {e}", flush=True)
+
+    print("Initializing Firebase...", flush=True)
+    try:
+        initialize_firebase()
+        print("Firebase OK", flush=True)
+    except Exception as e:
+        print(f"Firebase FAILED (non-fatal): {e}", flush=True)
     yield
     await close_redis_pool()
     await close_postgres_pool()
@@ -57,7 +77,7 @@ app = FastAPI(title="AcadeMong API", version="0.1.0", lifespan=lifespan)
 app.add_middleware(RequestLoggingMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=["http://localhost:3000", "https://purinboonpetch.com", "https://academong.purinboonpetch.com"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -105,6 +125,10 @@ async def _check_ollama() -> str:
             return "ok" if r.status_code == 200 else f"error: status {r.status_code}"
     except Exception as e:
         return f"error: {e}"
+
+@app.get("/ping")
+async def ping_endpoint():
+    return {"status": "ok"}
 
 @app.get("/health")
 async def health():

@@ -81,7 +81,7 @@ export default function EligibilityOverview({ results, getToken }) {
       try {
         const token = await getToken();
         if (controller.signal.aborted) return;
-        const res = await fetch("/api/chat/cutoffs/batch", {
+        const res = await fetch((import.meta.env.VITE_API_BASE||"")+"/api/chat/cutoffs/batch", {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
           body: JSON.stringify({ ids: topEligible.map((r) => r.admission_project_id) }),

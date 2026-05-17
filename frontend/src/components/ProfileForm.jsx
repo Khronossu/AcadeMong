@@ -107,7 +107,7 @@ export default function ProfileForm({ getToken, onSaved }) {
 
   useEffect(() => {
     getToken()
-      .then((token) => fetch("/api/profile/me", { headers: { Authorization: `Bearer ${token}` } }))
+      .then((token) => fetch((import.meta.env.VITE_API_BASE||"")+"/api/profile/me", { headers: { Authorization: `Bearer ${token}` } }))
       .then((r) => r.json())
       .then((data) => {
         const hasData = data.gpax != null || data.test_scores?.length || data.interests?.length;
@@ -167,7 +167,7 @@ export default function ProfileForm({ getToken, onSaved }) {
 
     try {
       const token = await getToken();
-      const res = await fetch("/api/profile/me", {
+      const res = await fetch((import.meta.env.VITE_API_BASE||"")+"/api/profile/me", {
         method: "PUT",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),

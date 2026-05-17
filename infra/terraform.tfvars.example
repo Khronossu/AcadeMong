@@ -1,0 +1,42 @@
+# Copy to terraform.tfvars and fill in values.
+# NEVER commit terraform.tfvars — it contains secrets.
+
+aws_region  = "ap-southeast-1"
+environment = "staging"
+project     = "academong"
+
+# ── Networking ────────────────────────────────────────────────────────────────
+vpc_cidr             = "10.0.0.0/16"
+public_subnet_cidrs  = ["10.0.1.0/24", "10.0.2.0/24"]
+private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24"]
+
+# ── Domain ────────────────────────────────────────────────────────────────────
+# Route 53 hosted zone must already exist for this domain
+domain_name   = "your-domain.com"
+app_subdomain = "app"
+
+# ── EC2 GPU ───────────────────────────────────────────────────────────────────
+# g4dn.xlarge = T4 16GB ~$0.53/hr  (fits all required models)
+# g5.xlarge   = A10G 24GB ~$1.01/hr (comfortable headroom)
+gpu_instance_type  = "g4dn.xlarge"
+gpu_key_name       = "your-key-pair-name"
+ssh_allowed_cidr   = "YOUR_IP/32"   # run: curl ifconfig.me
+gpu_volume_size_gb = 60
+
+# ── RDS ───────────────────────────────────────────────────────────────────────
+rds_instance_class    = "db.t4g.medium"
+rds_allocated_storage = 20
+db_name               = "tcas_advisor"
+db_username           = "admin"
+
+# ── ElastiCache ───────────────────────────────────────────────────────────────
+redis_node_type = "cache.t4g.small"
+
+# ── ECS ───────────────────────────────────────────────────────────────────────
+fastapi_cpu           = 1024
+fastapi_memory        = 2048
+fastapi_desired_count = 1
+
+# ── Firebase ──────────────────────────────────────────────────────────────────
+# Single-line minified JSON from Firebase Console → Project Settings → Service Accounts
+firebase_credentials_json = "{\"type\":\"service_account\", ...}"

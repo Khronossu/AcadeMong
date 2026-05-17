@@ -37,7 +37,7 @@ export default function ChatInterface({ getToken, sessions, setSessions, activeS
       try {
         const token = await getToken();
         if (controller.signal.aborted) return;
-        const res = await fetch(`/api/chat/${activeSession.id}/messages`, {
+        const res = await fetch((import.meta.env.VITE_API_BASE||"")+`/api/chat/${activeSession.id}/messages`, {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });
@@ -51,7 +51,7 @@ export default function ChatInterface({ getToken, sessions, setSessions, activeS
 
   async function api(path, opts = {}) {
     const token = await getToken();
-    const res = await fetch(path, {
+    const res = await fetch((import.meta.env.VITE_API_BASE || "") + path, {
       ...opts,
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, ...opts.headers },
     });
@@ -228,7 +228,7 @@ function RightPanel({ getToken }) {
     (async () => {
       try {
         const token = await getToken();
-        const res = await fetch("/api/profile/me", { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
+        const res = await fetch((import.meta.env.VITE_API_BASE||"")+"/api/profile/me", { headers: { Authorization: `Bearer ${token}` }, signal: controller.signal });
         if (res.ok) setProfile(await res.json());
       } catch { /* graceful */ }
     })();
