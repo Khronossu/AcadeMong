@@ -1,0 +1,481 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AcadeMong — Light Earth Tone</title>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', 'Sarabun', sans-serif; height: 100vh; overflow: hidden; }
+
+    /* ── Accent switcher ── */
+    .bar {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 999;
+      display: flex; align-items: center; gap: 6px;
+      background: #fff; padding: 7px 16px; border-bottom: 1px solid #e5e0d8;
+      box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    }
+    .bar-label { font-size: 11px; color: #888; margin-right: 4px; }
+    .ac-btn {
+      display: flex; align-items: center; gap: 6px; padding: 4px 10px;
+      border: 1.5px solid #e0dbd4; border-radius: 20px; cursor: pointer;
+      background: #fff; font-size: 11px; color: #666; font-family: inherit;
+      transition: all .15s;
+    }
+    .ac-btn .dot { width: 10px; height: 10px; border-radius: 50%; }
+    .ac-btn.active { border-color: var(--accent); color: var(--accent); font-weight: 600; background: var(--accent-bg); }
+    .view-btn {
+      margin-left: auto; padding: 4px 10px; border: 1px solid #e0dbd4;
+      border-radius: 16px; cursor: pointer; background: #fff; font-size: 11px;
+      color: #666; font-family: inherit;
+    }
+    .view-btn.active { background: #111; color: #fff; border-color: #111; }
+
+    /* ── CSS vars for accent themes ── */
+    body.ac-sage     { --accent: #5c8a5e; --accent2: #4a7a4c; --accent-bg: #f0f7f0; --accent-light: rgba(92,138,94,.1); }
+    body.ac-ochre    { --accent: #b8872a; --accent2: #a07520; --accent-bg: #fdf6e8; --accent-light: rgba(184,135,42,.1); }
+    body.ac-dustrose { --accent: #a0607a; --accent2: #8a4f67; --accent-bg: #fdf0f4; --accent-light: rgba(160,96,122,.1); }
+    body.ac-slate    { --accent: #5a7a8a; --accent2: #4a6878; --accent-bg: #f0f5f7; --accent-light: rgba(90,122,138,.1); }
+    body.ac-olive    { --accent: #7a8a3a; --accent2: #687830; --accent-bg: #f5f7ec; --accent-light: rgba(122,138,58,.1); }
+
+    /* ── Light palette ── */
+    :root {
+      --bg:      #f5f0ea;
+      --surface: #fff;
+      --card:    #faf7f3;
+      --border:  #e8e1d8;
+      --muted:   #d0c8bc;
+      --text1:   #1e1a16;
+      --text2:   #6b6258;
+      --text3:   #a09080;
+      --sage:    #5c8a5e;
+      --red:     #a05050;
+    }
+
+    .shell { display: flex; height: calc(100vh - 37px); margin-top: 37px; }
+    .variant { display: none; }
+    .variant.active { display: flex; width: 100%; }
+
+    /* ── Left panel ── */
+    .left {
+      width: 220px; background: var(--surface); border-right: 1px solid var(--border);
+      display: flex; flex-direction: column; flex-shrink: 0;
+    }
+    .left-logo {
+      padding: 14px 16px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px;
+    }
+    .logo-mark {
+      width: 30px; height: 30px; background: var(--accent);
+      border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 15px;
+    }
+    .logo-name { font-size: 15px; font-weight: 700; color: var(--text1); letter-spacing: -.3px; }
+    .logo-sub  { font-size: 10px; color: var(--text3); }
+
+    .nav-section { padding: 10px 0; }
+    .nav-label { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--text3); font-weight: 600; padding: 0 14px 6px; }
+    .nav-item {
+      display: flex; align-items: center; gap: 9px; padding: 7px 14px;
+      font-size: 13px; color: var(--text2); cursor: pointer;
+      border-left: 2px solid transparent; transition: all .12s;
+    }
+    .nav-item:hover { color: var(--text1); background: var(--card); }
+    .nav-item.active { color: var(--accent); border-left-color: var(--accent); background: var(--accent-light); font-weight: 500; }
+    .nav-badge { margin-left: auto; background: var(--accent); color: #fff; border-radius: 8px; padding: 1px 6px; font-size: 10px; }
+
+    .chat-list { flex: 1; overflow-y: auto; }
+    .chat-entry {
+      display: flex; align-items: center; gap: 8px; padding: 6px 14px;
+      font-size: 12px; color: var(--text3); cursor: pointer;
+      border-left: 2px solid transparent; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .chat-entry:hover { color: var(--text2); background: var(--card); }
+    .chat-entry.active { color: var(--text2); border-left-color: var(--muted); font-weight: 500; }
+    .ce-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--muted); flex-shrink: 0; }
+    .chat-entry.active .ce-dot { background: var(--accent); }
+
+    .left-bottom { padding: 10px; border-top: 1px solid var(--border); }
+    .user-row { display: flex; align-items: center; gap: 9px; padding: 7px 8px; border-radius: 8px; cursor: pointer; }
+    .user-row:hover { background: var(--card); }
+    .user-av { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: #fff; }
+    .user-name { font-size: 12px; color: var(--text1); font-weight: 500; }
+    .user-role { font-size: 10px; color: var(--text3); }
+
+    /* ── Center ── */
+    .center { flex: 1; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); }
+
+    .ch-header {
+      padding: 10px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 10px; background: var(--surface); flex-shrink: 0;
+    }
+    .ch-title { font-size: 13px; font-weight: 600; color: var(--text1); flex: 1; }
+    .ch-sub { font-size: 11px; color: var(--text3); }
+    .mode-toggle { display: flex; background: var(--card); border-radius: 8px; padding: 3px; border: 1px solid var(--border); }
+    .mode-btn { padding: 4px 12px; border-radius: 6px; font-size: 11px; cursor: pointer; border: none; background: transparent; color: var(--text3); font-family: inherit; transition: all .12s; white-space: nowrap; }
+    .mode-btn.active { background: var(--surface); color: var(--accent); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+
+    .messages { flex: 1; overflow-y: auto; padding: 20px; display: flex; flex-direction: column; gap: 14px; }
+    .msg { display: flex; gap: 10px; align-items: flex-start; }
+    .msg.user { flex-direction: row-reverse; }
+    .msg-av { width: 26px; height: 26px; border-radius: 7px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; }
+    .av-ai   { background: var(--accent); color: #fff; }
+    .av-user { background: var(--muted); color: var(--text1); }
+    .bubble { padding: 10px 14px; font-size: 13.5px; line-height: 1.65; border-radius: 10px; max-width: 80%; }
+    .b-ai   { background: var(--surface); border: 1px solid var(--border); color: var(--text1); border-radius: 2px 10px 10px 10px; }
+    .b-user { background: var(--accent); color: #fff; border-radius: 10px 2px 10px 10px; }
+    .bubble strong { color: var(--accent2); }
+    .b-user strong { color: rgba(255,255,255,.85); }
+
+    .typing { display: flex; gap: 4px; padding: 10px 14px; }
+    .typing span { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); animation: pulse 1.2s infinite; }
+    .typing span:nth-child(2) { animation-delay: .2s; }
+    .typing span:nth-child(3) { animation-delay: .4s; }
+    @keyframes pulse { 0%,80%,100%{opacity:.3} 40%{opacity:.9} }
+
+    .input-area { padding: 12px 20px; border-top: 1px solid var(--border); background: var(--surface); display: flex; gap: 8px; align-items: flex-end; }
+    .input-box { flex: 1; background: var(--card); border: 1.5px solid var(--border); border-radius: 10px; padding: 9px 13px; resize: none; font-size: 13.5px; color: var(--text1); outline: none; font-family: inherit; line-height: 1.5; transition: border-color .15s; }
+    .input-box:focus { border-color: var(--accent); }
+    .input-box::placeholder { color: var(--text3); }
+    .send-btn { width: 36px; height: 36px; background: var(--accent); border: none; border-radius: 9px; cursor: pointer; color: #fff; display: flex; align-items: center; justify-content: center; flex-shrink: 0; transition: background .15s; }
+    .send-btn:hover { background: var(--accent2); }
+
+    /* ── Right ── */
+    .right { width: 240px; border-left: 1px solid var(--border); background: var(--surface); padding: 14px; overflow-y: auto; flex-shrink: 0; }
+    .rp-label { font-size: 10px; text-transform: uppercase; letter-spacing: .8px; color: var(--text3); font-weight: 600; margin-bottom: 10px; }
+    .rp-section { margin-bottom: 20px; }
+    .rp-card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 10px; margin-bottom: 6px; }
+    .rp-major { font-size: 12px; font-weight: 600; color: var(--text1); margin-bottom: 2px; line-height: 1.4; }
+    .rp-fac { font-size: 11px; color: var(--text3); margin-bottom: 6px; }
+    .rp-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 4px; font-size: 10px; font-weight: 600; }
+    .badge-pass { background: rgba(92,138,94,.12); color: var(--sage); }
+    .badge-fail { background: rgba(160,80,80,.12); color: var(--red); }
+    .profile-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--border); }
+    .profile-row:last-child { border-bottom: none; }
+    .pr-key { font-size: 11px; color: var(--text3); }
+    .pr-val { font-size: 12px; font-weight: 600; color: var(--text1); }
+
+    /* ── Eligibility view ── */
+    .elig-shell { display: flex; height: calc(100vh - 37px); margin-top: 37px; }
+    .elig-main { flex: 1; overflow-y: auto; padding: 24px; background: var(--bg); }
+    .page-title { font-size: 18px; font-weight: 700; color: var(--text1); margin-bottom: 4px; }
+    .page-sub { font-size: 13px; color: var(--text3); margin-bottom: 14px; }
+    .summary-chips { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+    .schip { padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; border: 1px solid var(--border); }
+    .schip-year { background: var(--surface); color: var(--text2); }
+    .schip-pass { background: rgba(92,138,94,.1); color: var(--sage); border-color: rgba(92,138,94,.25); }
+    .filter-row { display: flex; gap: 6px; margin-bottom: 18px; flex-wrap: wrap; align-items: center; }
+    .fl { font-size: 11px; color: var(--text3); margin-right: 2px; }
+    .fpill { padding: 4px 12px; border: 1px solid var(--border); border-radius: 20px; font-size: 12px; color: var(--text3); cursor: pointer; background: var(--surface); font-family: inherit; }
+    .fpill.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .sep { width: 1px; height: 16px; background: var(--border); margin: 0 6px; }
+
+    .univ-group { border: 1px solid var(--border); border-radius: 10px; margin-bottom: 10px; overflow: hidden; background: var(--surface); }
+    .ug-hd { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; cursor: pointer; border-bottom: 1px solid var(--border); background: var(--card); }
+    .ug-name { font-size: 13px; font-weight: 600; color: var(--text1); }
+    .ug-count { font-size: 11px; color: var(--sage); }
+    .ug-body { padding: 8px 10px; }
+
+    .major-card { border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; overflow: hidden; border-left: 3px solid var(--sage); }
+    .major-card.partial { border-left-color: var(--accent); }
+    .major-card.none { border-left-color: var(--red); }
+    .mc-hd { display: flex; align-items: center; gap: 10px; padding: 10px 12px; cursor: pointer; background: var(--surface); }
+    .mc-name { font-size: 13px; font-weight: 600; color: var(--text1); flex: 1; }
+    .mc-fac { font-size: 11px; color: var(--text3); }
+    .mc-pass { font-size: 11px; font-weight: 600; color: var(--sage); }
+    .mc-partial { font-size: 11px; font-weight: 600; color: var(--accent); }
+    .save-btn { padding: 3px 10px; border: 1px solid var(--border); border-radius: 16px; font-size: 11px; color: var(--text2); background: transparent; cursor: pointer; font-family: inherit; transition: all .12s; }
+    .save-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .proj-row { display: flex; align-items: center; gap: 8px; padding: 7px 12px; border-top: 1px solid var(--border); cursor: pointer; background: var(--card); }
+    .proj-row:hover { background: var(--bg); }
+    .pbadge { padding: 1px 7px; border-radius: 4px; font-size: 10px; font-weight: 600; flex-shrink: 0; white-space: nowrap; }
+    .pb-pass { background: rgba(92,138,94,.12); color: var(--sage); }
+    .pb-fail { background: rgba(160,80,80,.12); color: var(--red); }
+    .proj-name { font-size: 12px; color: var(--text2); flex: 1; }
+    .proj-tag { font-size: 10px; color: var(--text3); background: var(--surface); border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; white-space: nowrap; }
+  </style>
+</head>
+<body class="ac-sage">
+  <!-- Top bar -->
+  <div class="bar">
+    <span class="bar-label">accent:</span>
+    <button class="ac-btn active" onclick="setAccent('ac-sage', this)">
+      <span class="dot" style="background:#5c8a5e"></span> Sage Green
+    </button>
+    <button class="ac-btn" onclick="setAccent('ac-ochre', this)">
+      <span class="dot" style="background:#b8872a"></span> Warm Ochre
+    </button>
+    <button class="ac-btn" onclick="setAccent('ac-dustrose', this)">
+      <span class="dot" style="background:#a0607a"></span> Dusty Rose
+    </button>
+    <button class="ac-btn" onclick="setAccent('ac-slate', this)">
+      <span class="dot" style="background:#5a7a8a"></span> Slate Blue
+    </button>
+    <button class="ac-btn" onclick="setAccent('ac-olive', this)">
+      <span class="dot" style="background:#7a8a3a"></span> Olive
+    </button>
+    <div class="sep" style="width:1px;height:16px;background:#e0dbd4;margin:0 6px"></div>
+    <button class="view-btn active" onclick="showView('chat', this)">💬 Chat</button>
+    <button class="view-btn" onclick="showView('elig', this)">✅ Eligibility</button>
+  </div>
+
+  <!-- ══ CHAT ══ -->
+  <div class="variant active" id="chat">
+    <div class="shell" style="width:100%">
+      <div class="left">
+        <div class="left-logo">
+          <div class="logo-mark">🎓</div>
+          <div>
+            <div class="logo-name">AcadeMong</div>
+            <div class="logo-sub">AI Advisor</div>
+          </div>
+        </div>
+        <div class="nav-section">
+          <div class="nav-label">Menu</div>
+          <div class="nav-item active"><span>💬</span> แชทกับ AI</div>
+          <div class="nav-item"><span>👤</span> โปรไฟล์</div>
+          <div class="nav-item"><span>✅</span> ตรวจสอบคุณสมบัติ <span class="nav-badge">12</span></div>
+          <div class="nav-item"><span>📌</span> สาขาที่บันทึก</div>
+          <div class="nav-item"><span>💼</span> อาชีพแนะนำ</div>
+        </div>
+        <div class="nav-section" style="flex:1;overflow:hidden;display:flex;flex-direction:column">
+          <div class="nav-label">การสนทนา</div>
+          <div class="chat-list">
+            <div class="chat-entry active"><div class="ce-dot"></div>อยากเป็นวิศวกร ต้องเรียน...</div>
+            <div class="chat-entry"><div class="ce-dot"></div>เปรียบเทียบคณะวิศวกรรม</div>
+            <div class="chat-entry"><div class="ce-dot"></div>GPAX 3.5 สมัครได้ที่ไหน</div>
+            <div class="chat-entry"><div class="ce-dot"></div>ความสนใจด้านดนตรี</div>
+          </div>
+        </div>
+        <div class="left-bottom">
+          <div class="user-row">
+            <div class="user-av">P</div>
+            <div><div class="user-name">purin</div><div class="user-role">นักเรียน</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="center">
+        <div class="ch-header">
+          <div>
+            <div class="ch-title">อยากเป็นวิศวกร ต้องเรียนอะไร</div>
+            <div class="ch-sub">Career Dreamer · 3 ข้อความ</div>
+          </div>
+          <div class="mode-toggle">
+            <button class="mode-btn active">🌟 Career Dreamer</button>
+            <button class="mode-btn">🎓 TCAS Advisor</button>
+          </div>
+        </div>
+
+        <div class="messages">
+          <div class="msg">
+            <div class="msg-av av-ai">A</div>
+            <div class="bubble b-ai">สวัสดีครับ! ฉันคือ AcadeMong ผู้ช่วย AI วางแผนอาชีพและการเรียน 🎓<br/>วันนี้อยากสำรวจเส้นทางอาชีพ หรือตรวจสอบสิทธิ์ TCAS ดีครับ?</div>
+          </div>
+          <div class="msg user">
+            <div class="msg-av av-user">P</div>
+            <div class="bubble b-user">ชอบคณิตศาสตร์และคอมพิวเตอร์มาก อยากรู้ว่ามีอาชีพอะไรที่เหมาะ</div>
+          </div>
+          <div class="msg">
+            <div class="msg-av av-ai">A</div>
+            <div class="bubble b-ai">คอมโบที่แข็งแกร่งมากเลยครับ! อาชีพที่น่าสนใจ<br/><br/>• <strong>Software Engineer</strong> — สร้างแอปและระบบ เงินเดือน 60–120k<br/>• <strong>Data Scientist</strong> — วิเคราะห์ข้อมูล ML เงินเดือน 70–130k<br/>• <strong>ML/AI Engineer</strong> — พัฒนาโมเดล AI เงินเดือน 80–150k<br/><br/>คุณชอบสร้างสิ่งของ หรือชอบวิเคราะห์ข้อมูลมากกว่ากันครับ?</div>
+          </div>
+          <div class="msg">
+            <div class="msg-av av-ai" style="opacity:0"></div>
+            <div class="bubble b-ai typing"><span></span><span></span><span></span></div>
+          </div>
+        </div>
+
+        <div class="input-area">
+          <textarea class="input-box" rows="2" placeholder="พิมพ์ข้อความ… (Enter ส่ง, Shift+Enter ขึ้นบรรทัดใหม่)"></textarea>
+          <button class="send-btn">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M22 2L11 13M22 2L15 22 11 13 2 9l20-7z"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="right">
+        <div class="rp-section">
+          <div class="rp-label">โปรไฟล์</div>
+          <div class="rp-card">
+            <div class="profile-row"><span class="pr-key">GPAX</span><span class="pr-val">3.75</span></div>
+            <div class="profile-row"><span class="pr-key">TGAT1</span><span class="pr-val">82</span></div>
+            <div class="profile-row"><span class="pr-key">A-Level Math1</span><span class="pr-val">68</span></div>
+            <div class="profile-row"><span class="pr-key">โรงเรียน</span><span class="pr-val" style="font-size:10px">สาธิตมหาวิทยาลัย</span></div>
+          </div>
+        </div>
+        <div class="rp-section">
+          <div class="rp-label">สาขาผ่านเกณฑ์</div>
+          <div class="rp-card">
+            <div class="rp-major">วิทยาการคอมพิวเตอร์</div>
+            <div class="rp-fac">คณะวิทย์ · จุฬาฯ</div>
+            <span class="rp-badge badge-pass">✓ ผ่านเกณฑ์</span>
+          </div>
+          <div class="rp-card">
+            <div class="rp-major">วิศวกรรมคอมพิวเตอร์</div>
+            <div class="rp-fac">คณะวิศวกรรม · เกษตร</div>
+            <span class="rp-badge badge-pass">✓ ผ่านเกณฑ์</span>
+          </div>
+          <div class="rp-card">
+            <div class="rp-major">แพทยศาสตร์</div>
+            <div class="rp-fac">คณะแพทย์ · มหิดล</div>
+            <span class="rp-badge badge-fail">✗ GPAX ไม่ผ่าน</span>
+          </div>
+        </div>
+        <div class="rp-section">
+          <div class="rp-label">อาชีพแนะนำ</div>
+          <div class="rp-card">
+            <div class="rp-major">Software Engineer</div>
+            <div class="rp-fac" style="color:var(--accent);font-weight:600;margin-bottom:0">85% เข้ากัน</div>
+          </div>
+          <div class="rp-card">
+            <div class="rp-major">Data Scientist</div>
+            <div class="rp-fac" style="color:var(--accent);font-weight:600;margin-bottom:0">82% เข้ากัน</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══ ELIGIBILITY ══ -->
+  <div class="variant" id="elig">
+    <div class="elig-shell" style="width:100%">
+      <div class="left">
+        <div class="left-logo">
+          <div class="logo-mark">🎓</div>
+          <div><div class="logo-name">AcadeMong</div><div class="logo-sub">AI Advisor</div></div>
+        </div>
+        <div class="nav-section">
+          <div class="nav-label">Menu</div>
+          <div class="nav-item"><span>💬</span> แชทกับ AI</div>
+          <div class="nav-item"><span>👤</span> โปรไฟล์</div>
+          <div class="nav-item active"><span>✅</span> ตรวจสอบคุณสมบัติ <span class="nav-badge">12</span></div>
+          <div class="nav-item"><span>📌</span> สาขาที่บันทึก</div>
+          <div class="nav-item"><span>💼</span> อาชีพแนะนำ</div>
+        </div>
+        <div class="left-bottom">
+          <div class="user-row">
+            <div class="user-av">P</div>
+            <div><div class="user-name">purin</div><div class="user-role">นักเรียน</div></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="elig-main">
+        <div class="page-title">ตรวจสอบคุณสมบัติ TCAS รอบ 3</div>
+        <div class="page-sub">บันทึก GPAX และคะแนนสอบในแท็บโปรไฟล์ก่อน แล้วกดตรวจสอบ</div>
+        <div class="summary-chips">
+          <span class="schip schip-year">ปีการศึกษา 2568</span>
+          <span class="schip schip-pass">✓ ผ่านเกณฑ์ 12 / 45 โครงการ</span>
+        </div>
+        <div class="filter-row">
+          <span class="fl">แสดง:</span>
+          <button class="fpill active">ผ่านเกณฑ์</button>
+          <button class="fpill">ไม่ผ่าน</button>
+          <button class="fpill">ทั้งหมด</button>
+          <div class="sep"></div>
+          <span class="fl">จัดกลุ่มตาม:</span>
+          <button class="fpill active">มหาวิทยาลัย</button>
+          <button class="fpill">คณะ</button>
+          <button class="fpill">สาขาวิชา</button>
+        </div>
+
+        <!-- Chula group -->
+        <div class="univ-group">
+          <div class="ug-hd">
+            <span class="ug-name">จุฬาลงกรณ์มหาวิทยาลัย</span>
+            <span class="ug-count">ผ่านเกณฑ์ 5/18 · 4 หลักสูตร ▲</span>
+          </div>
+          <div class="ug-body">
+            <div class="major-card">
+              <div class="mc-hd">
+                <div style="flex:1">
+                  <div class="mc-name">วิทยาการคอมพิวเตอร์</div>
+                  <div style="display:flex;gap:10px;margin-top:2px">
+                    <span class="mc-fac">คณะวิทยาศาสตร์</span>
+                    <span class="mc-pass">2/3 โครงการผ่านเกณฑ์</span>
+                  </div>
+                </div>
+                <button class="save-btn">บันทึก</button>
+                <span style="color:var(--text3);font-size:11px">▼</span>
+              </div>
+              <div class="proj-row">
+                <span class="pbadge pb-pass">ผ่าน</span>
+                <span class="proj-name">รับตรงร่วมกัน (Admission)</span>
+                <span class="proj-tag">GPAX ≥ 2.00</span>
+                <span class="proj-tag">40 ที่นั่ง</span>
+              </div>
+              <div class="proj-row">
+                <span class="pbadge pb-pass">ผ่าน</span>
+                <span class="proj-name">โครงการความสามารถพิเศษด้านวิทยาศาสตร์และเทคโนโลยี</span>
+                <span class="proj-tag">30 ที่นั่ง</span>
+              </div>
+              <div class="proj-row">
+                <span class="pbadge pb-fail">ไม่ผ่าน</span>
+                <span class="proj-name">โครงการจุฬาฯ-ชนบท</span>
+                <span class="proj-tag" style="color:var(--red);border-color:rgba(160,80,80,.2)">TGAT ≥ 90</span>
+              </div>
+            </div>
+
+            <div class="major-card partial">
+              <div class="mc-hd">
+                <div style="flex:1">
+                  <div class="mc-name">วิศวกรรมคอมพิวเตอร์</div>
+                  <div style="display:flex;gap:10px;margin-top:2px">
+                    <span class="mc-fac">คณะวิศวกรรมศาสตร์</span>
+                    <span class="mc-partial">1/2 โครงการผ่านเกณฑ์</span>
+                  </div>
+                </div>
+                <button class="save-btn">บันทึก</button>
+                <span style="color:var(--text3);font-size:11px">▶</span>
+              </div>
+            </div>
+
+            <div class="major-card none">
+              <div class="mc-hd">
+                <div style="flex:1">
+                  <div class="mc-name">หลักสูตรครุศาสตรบัณฑิต</div>
+                  <div style="display:flex;gap:10px;margin-top:2px">
+                    <span class="mc-fac">คณะครุศาสตร์</span>
+                    <span style="font-size:11px;color:var(--red);font-weight:600">0/5 โครงการผ่านเกณฑ์</span>
+                  </div>
+                </div>
+                <button class="save-btn">บันทึก</button>
+                <span style="color:var(--text3);font-size:11px">▶</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="univ-group">
+          <div class="ug-hd">
+            <span class="ug-name">มหาวิทยาลัยเกษตรศาสตร์</span>
+            <span class="ug-count">ผ่านเกณฑ์ 4/12 · 3 หลักสูตร ▼</span>
+          </div>
+        </div>
+        <div class="univ-group">
+          <div class="ug-hd">
+            <span class="ug-name">มหาวิทยาลัยมหิดล</span>
+            <span class="ug-count">ผ่านเกณฑ์ 3/8 · 2 หลักสูตร ▼</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function setAccent(cls, btn) {
+      document.body.className = cls;
+      document.querySelectorAll('.ac-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    }
+    function showView(id, btn) {
+      document.querySelectorAll('.variant').forEach(v => v.classList.remove('active'));
+      document.querySelectorAll('.view-btn').forEach(b => b.classList.remove('active'));
+      document.getElementById(id).classList.add('active');
+      btn.classList.add('active');
+    }
+  </script>
+</body>
+</html>

@@ -1,14 +1,14 @@
 MODEL_CONFIG = {
     "primary": {
-        "model": "llama3.2:1b",  # TODO: switch to scb10x/llama3.1-typhoon2-8b-instruct when pulled
-        "intents": ["general", "eligibility", "recommendation", "career"],
+        "model": "scb10x/llama3.1-typhoon2-8b-instruct", 
+        "intents": ['dreamer_chat', 'tcas_chat'],
         "temperature": 0.3,
         "top_p": 0.9,
         "max_tokens": 1000
     },
     "rag": {
-        "model": "llama3.2:1b",  # TODO: switch to scb10x/llama3.1-typhoon2-8b-instruct when pulled
-        "intents": ["preparation", "comparison"],
+        "model": "scb10x/llama3.1-typhoon2-8b-instruct",
+        "intents": ['tcas_rag_retrieval'],
         "temperature": 0.2,   # lower — needs to stay grounded to retrieved context
         "top_p": 0.85,
         "max_tokens": 1500
@@ -17,7 +17,7 @@ MODEL_CONFIG = {
         "model": "nomic-embed-text"
     },
     "fallback": {
-        "model": "llama3.1-8b",
+        "model": "llama3.1:8b",
         "trigger": "primary_model_failure"
     }
 }
